@@ -58,6 +58,10 @@ externamente tienen prioridad sobre `.env`.
 - La dirección central es la lectura del modelo para el horizonte elegido. La banda futura superior
   e inferior es un rango aproximado calculado con ATR y momentum, no una segunda predicción
   contraria. No es una prediccion garantizada, asesoramiento financiero ni una orden automatica.
+- Al cambiar de ventana, la aplicación recalcula las velas, indicadores y predicción del nuevo
+  horizonte. Si el mercado está cerrado y no hay velas exactamente en esa ventana, recupera la
+  última sesión disponible, recalcula con historial suficiente y muestra un aviso de antigüedad.
+  Mientras carga o si falla, limpia la lectura anterior para evitar mezclar horizontes.
 
 El panel sigue siendo alert-only, paper trading y simulación local. No envia ordenes reales ni
 conecta con un broker.

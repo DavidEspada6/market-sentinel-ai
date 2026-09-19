@@ -55,6 +55,29 @@ class UnavailableYahooProvider:
         return []
 
 
+class ShortWindowFallbackProvider:
+    provider_name = "fallback-test"
+
+    def historical_candles(self, symbol, timeframe, start, end):
+        if end - start <= timedelta(minutes=5):
+            return []
+        step = timedelta(minutes=5)
+        first = end - (step * 160)
+        return [
+            Candle(
+                symbol=symbol,
+                timeframe=timeframe,
+                opened_at=first + (step * index),
+                open=100.0 + index * 0.1,
+                high=100.1 + index * 0.1,
+                low=99.9 + index * 0.1,
+                close=100.0 + index * 0.1,
+                volume=100_000.0,
+            )
+            for index in range(160)
+        ]
+
+
 class O6MarketUITests(unittest.TestCase):
     def test_chart_windows_cover_requested_filters(self) -> None:
         self.assertEqual(
@@ -142,6 +165,9 @@ class O6MarketUITests(unittest.TestCase):
             self.assertIn('id="market-explanation"', html)
             self.assertIn('id="explanation-drivers"', html)
             self.assertIn('id="explanation-levels"', html)
+            self.assertIn("clearMarketState", html)
+            self.assertIn("marketRequestId", html)
+            self.assertIn("data_notice", html)
             self.assertIn("mousemove", html)
             self.assertIn('data-chart-mode="candles"', html)
             self.assertIn("Velas OHLC", html)
@@ -167,6 +193,28 @@ class O6MarketUITests(unittest.TestCase):
 
             self.assertEqual(response.status_code, 503)
             self.assertIn("fresh yahoo market data is unavailable", response.json()["detail"])
+
+    def test_short_window_recalculates_from_latest_provider_session(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            database = Path(directory) / "market.sqlite3"
+            settings = replace(Settings.from_env(), database_url=f"sqlite:///{database}")
+            repository = SQLiteCandleRepository(database)
+            service = MarketScanService(
+                settings,
+                repository=repository,
+                provider=ShortWindowFallbackProvider(),
+            )
+            response = TestClient(create_app(settings, service)).get(
+                "/api/v1/market/AMZN", params={"window": "5m"}
+            )
+            payload = response.json()
+
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(payload["source"], "provider")
+            self.assertEqual(payload["timeframe"], "5m")
+            self.assertTrue(payload["data_notice"])
+            self.assertGreaterEqual(payload["candle_count"], 1)
+            self.assertTrue(payload["explanation"]["levels"])
 
 
 if __name__ == "__main__":

@@ -12,6 +12,7 @@ from market_sentinel_ai.adapters.market_data import (
     build_instrument_search_provider,
 )
 from market_sentinel_ai.analytics import (
+    ChartWindowSpec,
     build_market_chart_payload,
     calculate_risk_metrics,
     chart_window_spec,
@@ -71,6 +72,29 @@ class SimulationPositionRequest(BaseModel):
 
 class SimulationCloseRequest(BaseModel):
     price: float | None = Field(default=None, gt=0)
+
+
+def _chart_fallback_lookback(timeframe: Timeframe) -> timedelta:
+    return {
+        Timeframe.ONE_MINUTE: timedelta(days=7),
+        Timeframe.FIVE_MINUTES: timedelta(days=60),
+        Timeframe.FIFTEEN_MINUTES: timedelta(days=60),
+        Timeframe.ONE_HOUR: timedelta(days=180),
+        Timeframe.ONE_DAY: timedelta(days=3650),
+    }[timeframe]
+
+
+def _select_chart_window(
+    candles: list,
+    spec: ChartWindowSpec,
+    used_fallback: bool,
+) -> list:
+    if not used_fallback or spec.lookback is None or not candles:
+        return candles
+    latest = candles[-1].opened_at
+    window_start = latest - spec.lookback
+    selected = [candle for candle in candles if window_start <= candle.opened_at <= latest]
+    return selected or [candles[-1]]
 
 
 def create_app(
@@ -314,6 +338,7 @@ def create_app(
         start = end - (spec.lookback or timedelta(days=3650))
         candles = []
         source = "cache"
+        data_notice: str | None = None
 
         try:
             fetched = list(
@@ -337,6 +362,38 @@ def create_app(
                 source = "provider"
         except (MarketDataProviderError, OSError, ValueError):
             candles = []
+
+        # Short chart windows are often empty outside market hours. Retry with
+        # a provider-supported history window so the model can recalculate from
+        # the latest completed session instead of returning stale UI state.
+        if not candles and spec.lookback is not None:
+            fallback_start = end - _chart_fallback_lookback(spec.timeframe)
+            try:
+                fallback = list(
+                    active_service.provider.historical_candles(
+                        market_symbol,
+                        spec.timeframe,
+                        fallback_start,
+                        end,
+                    )
+                )
+                candles = sorted(
+                    [
+                        candle
+                        for candle in fallback
+                        if fallback_start <= candle.opened_at < end
+                    ],
+                    key=lambda candle: candle.opened_at,
+                )
+                if candles:
+                    repository.upsert_many(candles)
+                    source = "provider"
+                    data_notice = (
+                        f"No había velas nuevas en {spec.label}; se recalcula con la "
+                        f"última vela disponible ({candles[-1].opened_at.isoformat()})."
+                    )
+            except (MarketDataProviderError, OSError, ValueError):
+                candles = []
 
         if not candles:
             cached = repository.list_candles(market_symbol, spec.timeframe, start, end)
@@ -363,6 +420,7 @@ def create_app(
                 ),
             )
 
+        chart_candles = _select_chart_window(candles, spec, data_notice is not None)
         analysis_candles = candles
         if len(candles) < 123:
             training_days = {
@@ -409,13 +467,13 @@ def create_app(
         ).from_prediction(prediction)
         plan = build_trade_plan(
             signal,
-            candles[-1],
+            analysis_candles[-1],
             features[-1],
             spec.timeframe,
             round_trip_cost_bps,
         )
         return build_market_chart_payload(
-            candles,
+            chart_candles,
             signal,
             plan,
             features[-1],
@@ -423,6 +481,7 @@ def create_app(
             spec=spec,
             provider=getattr(active_service.provider, "provider_name", "unknown"),
             source=source,
+            data_notice=data_notice,
         )
 
     @app.post("/api/v1/watchlist")

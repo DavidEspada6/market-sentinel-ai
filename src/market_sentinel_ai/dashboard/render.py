@@ -662,6 +662,7 @@ def render_operational_dashboard(
     let selectedWindow = '1d';
     let chartMode = 'line';
     let periodicTimer = null;
+    let marketRequestId = 0;
     let lastChartPayload = null;
     let chartLayout = null;
     let chartHoverIndex = null;
@@ -934,6 +935,35 @@ def render_operational_dashboard(
       renderList(explanationWarnings, explanation.warnings, 'Sin advertencias adicionales; revisa siempre el rango de incertidumbre.');
     }}
 
+    function clearMarketState(message) {{
+      lastChartPayload = null;
+      chartHoverIndex = null;
+      chartTooltip.hidden = true;
+      chartLayout = null;
+      marketTitle.textContent = selectedSymbol ? `${{selectedSymbol}} · Sin datos` : 'Sin datos';
+      marketMeta.textContent = message || 'No hay datos frescos para recalcular este horizonte.';
+      marketAction.textContent = 'SIN DATOS';
+      marketAction.className = 'pill wait';
+      marketSource.textContent = 'DATOS NO DISPONIBLES';
+      marketSource.className = 'pill wait';
+      marketDecision.className = 'decision-note wait';
+      marketDecision.textContent = 'No se genera una predicción hasta disponer de velas del horizonte seleccionado.';
+      marketDisclaimer.textContent = 'La predicción anterior se ha limpiado para no mezclar horizontes ni mostrar datos obsoletos.';
+      marketCanvas.style.display = 'none';
+      marketEmpty.style.display = 'block';
+      marketEmpty.textContent = 'Sin datos para este intervalo. Prueba Actualizar datos o vuelve a intentarlo durante la sesión.';
+      forecastLabel.textContent = 'Sin escenario';
+      setSummary({{ latest: {{}}, change_pct: null, signal: {{}}, forecast: {{}}, levels: {{}} }});
+      renderExplanation({{
+        signal: {{direction: 'NO_TRADE'}},
+        explanation: {{
+          summary: 'No se puede recalcular este horizonte con datos frescos.',
+          drivers: [], levels: [],
+          warnings: [message || 'El proveedor no ha devuelto velas para este intervalo.']
+        }}
+      }});
+    }}
+
     function drawMarketChart(payload, hoverIndex = chartHoverIndex) {{
       const historical = payload.candles || [];
       const future = (payload.forecast && payload.forecast.center) || [];
@@ -1144,25 +1174,33 @@ def render_operational_dashboard(
     async function loadMarket(symbol, windowValue) {{
       if (!symbol) return;
       selectedSymbol = symbol; selectedWindow = windowValue; markSelectedRow(symbol);
+      const requestId = ++marketRequestId;
       simulationSymbol.value = symbol;
       document.querySelectorAll('.window-button').forEach((button) => {{
         button.classList.toggle('active', button.dataset.window === windowValue);
       }});
-      marketMeta.textContent = 'Cargando velas, señal y escenario...';
-      const response = await fetch(`/api/v1/market/${{encodeURIComponent(symbol)}}?window=${{windowValue}}`);
+      clearMarketState('Recalculando velas, indicadores y predicción para este horizonte...');
+      let response;
+      try {{
+        response = await fetch(`/api/v1/market/${{encodeURIComponent(symbol)}}?window=${{windowValue}}`);
+      }} catch (error) {{
+        if (requestId === marketRequestId) clearMarketState('No se pudo conectar con el proveedor de datos.');
+        return;
+      }}
+      if (requestId !== marketRequestId) return;
       if (!response.ok) {{
         const error = await response.json().catch(() => ({{}}));
-        marketMeta.textContent = error.detail || 'No hay datos frescos para este intervalo.';
-        marketDecision.className = 'decision-note wait';
-        marketDecision.textContent = 'Sin datos frescos: no se genera una predicción.';
+        clearMarketState(error.detail || 'No hay datos frescos para este intervalo.');
         return;
       }}
       const payload = await response.json();
+      if (requestId !== marketRequestId) return;
       lastChartPayload = payload;
       chartHoverIndex = null; chartTooltip.hidden = true;
       marketTitle.textContent = `${{payload.symbol}} · ${{payload.name}}`;
       marketMeta.textContent = `${{payload.window_label}} · ${{payload.candle_count}} velas · ` +
-        `${{payload.timeframe}} · ${{payload.currency}} · modelo ${{payload.signal.model}}`;
+        `${{payload.timeframe}} · ${{payload.currency}} · modelo ${{payload.signal.model}}` +
+        (payload.data_notice ? ` · ${{payload.data_notice}}` : '');
       const direction = payload.signal.direction;
       const directionClass = direction === 'LONG' ? 'long' : direction === 'SHORT' ? 'short' : 'wait';
       const directionLabel = direction === 'LONG' ? 'SEÑAL ALCISTA' :
@@ -1178,10 +1216,12 @@ def render_operational_dashboard(
       forecastLabel.textContent = direction === 'NO_TRADE' ?
         'Rango de incertidumbre (sin dirección)' : 'Rango futuro aprox.';
       const sourceIsDemo = payload.provider === 'demo';
+      const sourceIsFallback = Boolean(payload.data_notice);
       marketSource.textContent = sourceIsDemo ? 'DATOS DEMO' :
+        sourceIsFallback ? `ÚLTIMA SESIÓN · ${{payload.provider}}` :
         payload.source === 'provider' ? `DATOS EN VIVO · ${{payload.provider}}` :
         `CACHÉ · ${{payload.provider}}`;
-      marketSource.className = 'pill ' + (sourceIsDemo ? 'demo' : '');
+      marketSource.className = 'pill ' + (sourceIsDemo ? 'demo' : sourceIsFallback ? 'wait' : '');
       setSummary(payload); renderExplanation(payload); marketDisclaimer.textContent = payload.disclaimer;
       marketCanvas.style.display = 'block'; marketEmpty.style.display = 'none'; drawMarketChart(payload);
     }}

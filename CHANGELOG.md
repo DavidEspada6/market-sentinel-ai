@@ -4,6 +4,16 @@ All notable changes to Market Sentinel AI will be documented in this file.
 
 The project follows semantic versioning once v1.0.0 is reached. Pre-1.0 releases map to the staged roadmap.
 
+## [2.9.3] - 2026-09-19
+
+### Fixed
+
+- Recalculate the selected market horizon with provider history when a short window has no
+  candles at the current wall-clock time, such as after a market closes.
+- Clear the previous horizon's signal, levels and explanation while a new timeframe is loading or
+  unavailable, preventing stale predictions from being shown as current.
+- Ignore out-of-order market responses when the user switches timeframes quickly.
+
 ## [2.9.2] - 2026-09-19
 
 ### Added

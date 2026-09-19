@@ -116,6 +116,7 @@ def build_market_chart_payload(
     spec: ChartWindowSpec,
     provider: str,
     source: str,
+    data_notice: str | None = None,
 ) -> dict[str, object]:
     latest = candles[-1]
     first_close = candles[0].close
@@ -133,6 +134,8 @@ def build_market_chart_payload(
         "timeframe": spec.timeframe.value,
         "provider": provider,
         "source": source,
+        "data_as_of": latest.opened_at.isoformat(),
+        "data_notice": data_notice,
         "candle_count": len(candles),
         "change_pct": change_pct,
         "candles": [_candle_to_dict(candle) for candle in candles],

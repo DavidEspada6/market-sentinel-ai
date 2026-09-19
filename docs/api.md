@@ -27,8 +27,10 @@ The default binding is local-only. The service does not place real orders.
 - DELETE /api/v1/watchlist/{symbol} disables a watchlist entry.
 - GET /api/v1/market/{symbol}?window=1d returns historical candles, signal context, risk levels
   and a quantitative explanation of the directional drivers and entry/target/stop levels, plus
-  an approximate ATR/momentum future envelope. Supported windows are `1m`, `5m`, `30m`,
-  `1h`, `6h`, `12h`, `1d`, `1w`, `1mo`, `3mo`, `6mo`, `1y`, `3y` and `total`.
+  an approximate ATR/momentum future envelope. The response includes `data_as_of` and, when a
+  short window is outside market hours, `data_notice` explaining that the latest completed
+  provider session was used for the recalculation. Supported windows are `1m`, `5m`, `30m`, `1h`,
+  `6h`, `12h`, `1d`, `1w`, `1mo`, `3mo`, `6mo`, `1y`, `3y` and `total`.
 - POST /api/v1/watchlist/scan scans every enabled watchlist instrument once and persists the
   scheduler run and resulting signals.
 - GET /api/v1/astra-usage lists today's request, cache, token and estimated-cost counters.
