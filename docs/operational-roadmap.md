@@ -13,18 +13,20 @@ releases make it a practical daily analysis tool while keeping paper trading as 
 | O6 | 2.6.0 | Complete | Interactive color dashboard, chart windows, future scenarios and visual risk levels |
 | O7 | 2.7.4 | Complete | Complete UI control center for scanning, paper metrics and diagnostics |
 | O8 | 2.8.2 | Complete | Adaptive predictions, directional watchlist zones and interactive chart inspection |
-| O9 | 2.9.3 | Current | Leveraged simulation, per-product explanations and horizon-aware recalculation |
-| O10 | 3.0.0 | Optional | Broker integration only after explicit approval and a separate security review |
+| O9 | 2.9.3 | Complete | Leveraged simulation, per-product explanations and horizon-aware recalculation |
+| O10 | 2.10.0 | Current | Continuous prediction evaluation, accuracy analytics and detailed simulation history |
+| O11 | 3.0.0 | Optional | Broker integration only after explicit approval and a separate security review |
 
 ## What "operational" means
 
-At O9 the app continuously scans configured instruments, persists every decision, retrains a
-local supervised directional model when enough provider history exists, exposes its out-of-sample
+At O10 the app continuously scans configured instruments, persists every decision and horizon
+prediction, resolves predictions against later provider prices, exposes accuracy analytics, retrains
+a local supervised directional model when enough provider history exists, exposes its out-of-sample
 metrics, alerts on new actionable changes, shows paper performance and risk metrics, and exposes
 scanning, diagnostics, paper history, context usage and a mark-to-market leveraged simulator directly
 in the visual workspace. It still does not submit real orders.
 
-O10 is not required for a useful operational application. It is deliberately separate because
+O11 is not required for a useful operational application. It is deliberately separate because
 real execution adds authentication, broker-specific behavior, reconciliation, order state,
 manual approval and incident-response requirements that should not be mixed into the analysis
 track.

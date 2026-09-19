@@ -1,0 +1,140 @@
+from __future__ import annotations
+
+import tempfile
+import unittest
+from dataclasses import replace
+from datetime import UTC, datetime, timedelta
+from pathlib import Path
+
+from fastapi.testclient import TestClient
+
+from market_sentinel_ai.api import create_app
+from market_sentinel_ai.config import Settings
+from market_sentinel_ai.domain.market import Candle, Timeframe
+from market_sentinel_ai.domain.operations import PredictionEvaluation
+from market_sentinel_ai.domain.prediction import Direction
+from market_sentinel_ai.operations import MarketScanService, PredictionMonitor
+from market_sentinel_ai.paper import SimulationLedger
+from market_sentinel_ai.storage import SQLiteCandleRepository
+
+
+class EmptyProvider:
+    provider_name = "evaluation-test"
+
+    def historical_candles(self, symbol, timeframe, start, end):
+        return []
+
+
+def _evaluation(now: datetime) -> PredictionEvaluation:
+    return PredictionEvaluation(
+        prediction_id="prediction-1",
+        prediction_key="AAPL:1m:reference",
+        symbol="AAPL",
+        timeframe="1m",
+        window="1m",
+        horizon_minutes=1,
+        generated_at=now - timedelta(minutes=10),
+        reference_time=now - timedelta(minutes=10),
+        reference_price=100.0,
+        direction=Direction.LONG,
+        probability=0.7,
+        confidence=0.7,
+        model_name="test-model",
+        expected_return_bps=10.0,
+        evaluation_threshold_bps=1.0,
+        due_at=now - timedelta(minutes=9),
+        status="pending",
+        metadata={"test": True},
+    )
+
+
+class PredictionEvaluationTests(unittest.TestCase):
+    def test_monitor_resolves_predictions_and_avoids_duplicates(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            database = Path(directory) / "market.sqlite3"
+            repository = SQLiteCandleRepository(database)
+            now = datetime.now(tz=UTC).replace(second=0, microsecond=0)
+            candles = [
+                Candle(
+                    symbol="AAPL",
+                    timeframe=Timeframe.ONE_MINUTE,
+                    opened_at=now - timedelta(minutes=20 - index),
+                    open=100 + index * 0.05,
+                    high=100.1 + index * 0.05,
+                    low=99.9 + index * 0.05,
+                    close=100 + index * 0.05,
+                    volume=100_000,
+                )
+                for index in range(20)
+            ]
+            repository.upsert_many(candles)
+            self.assertTrue(repository.record_prediction(_evaluation(now)))
+
+            settings = replace(Settings.from_env(), database_url=f"sqlite:///{database}")
+            service = MarketScanService(settings, repository=repository, provider=EmptyProvider())
+            monitor = PredictionMonitor(service)
+
+            first = monitor.run_once(now=now)
+            self.assertEqual(first.resolved, 1)
+            self.assertGreaterEqual(first.generated, 1)
+            resolved = repository.list_predictions(status="resolved")
+            self.assertTrue(resolved[0].correct)
+            self.assertGreater(resolved[0].actual_return_bps or 0, 0)
+
+            second = monitor.run_once(now=now)
+            self.assertEqual(second.generated, 0)
+            self.assertEqual(len(repository.list_predictions()), 2)
+
+    def test_analysis_page_and_filters_expose_prediction_metrics(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            database = Path(directory) / "market.sqlite3"
+            repository = SQLiteCandleRepository(database)
+            now = datetime.now(tz=UTC).replace(second=0, microsecond=0)
+            repository.record_prediction(_evaluation(now))
+            repository.resolve_prediction(
+                "prediction-1",
+                actual_price=101.0,
+                actual_return_bps=100.0,
+                correct=True,
+                resolved_at=now,
+            )
+            settings = replace(Settings.from_env(), database_url=f"sqlite:///{database}")
+            service = MarketScanService(settings, repository=repository, provider=EmptyProvider())
+            client = TestClient(create_app(settings, service))
+
+            page = client.get("/analysis")
+            response = client.get(
+                "/api/v1/prediction-analytics",
+                params={"symbol": "AAPL", "window": "1m"},
+            )
+
+            self.assertEqual(page.status_code, 200)
+            self.assertIn("Resultado por horizonte", page.text)
+            self.assertIn("/api/v1/prediction-analytics", page.text)
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.json()["accuracy_pct"], 100.0)
+            self.assertEqual(response.json()["best_window"], "1m")
+
+    def test_simulation_trade_keeps_cost_and_leverage_details(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            repository = SQLiteCandleRepository(Path(directory) / "market.sqlite3")
+            ledger = SimulationLedger(starting_equity=10_000, store=repository)
+            position = ledger.open_position(
+                symbol="AAPL",
+                direction=Direction.LONG,
+                margin=1_000,
+                leverage=5,
+                entry_price=100,
+            )
+            trade = ledger.close_position(position.position_id, 101)
+            saved = repository.list_paper_trades("simulation")[0].trade
+
+            self.assertEqual(trade.leverage, 5)
+            self.assertEqual(saved.margin, 1_000)
+            self.assertEqual(saved.leverage, 5)
+            self.assertGreater(saved.entry_cost + saved.exit_cost, 0)
+            self.assertEqual(saved.close_reason, "manual")
+
+
+if __name__ == "__main__":
+    unittest.main()

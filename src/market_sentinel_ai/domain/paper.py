@@ -47,6 +47,12 @@ class PaperTrade:
     pnl: float
     opened_at: datetime
     closed_at: datetime
+    margin: float = 0.0
+    leverage: float = 1.0
+    entry_cost: float = 0.0
+    exit_cost: float = 0.0
+    notional: float = 0.0
+    close_reason: str = "manual"
 
 
 @dataclass(frozen=True)

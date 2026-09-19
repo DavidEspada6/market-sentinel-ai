@@ -99,6 +99,10 @@ def render_dashboard(model: DashboardViewModel) -> str:
     .track {{ height: 12px; background: #edf1f3; border-radius: 999px; overflow: hidden; }}
     .fill {{ height: 100%; background: var(--teal); }}
     .muted {{ color: var(--muted); }}
+    .top-nav {{ display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }}
+    .top-nav a {{ color: var(--teal); border: 1px solid #b8c7d1; background: #fff;
+      text-decoration: none; padding: 6px 10px; font-size: 12px; }}
+    .top-nav a.active {{ color: #fff; background: var(--teal); border-color: var(--teal); }}
     .static-report-note {{ background: #fff8e6; border-left: 3px solid var(--amber); padding: 10px 12px;
       color: #72520f; font-size: 13px; margin-bottom: 14px; }}
     @media (max-width: 760px) {{
@@ -407,7 +411,12 @@ def render_operational_dashboard(
 </head>
 <body>
   <header>
-    <div><h1>Market Sentinel AI</h1><div class="meta">Operational dashboard</div></div>
+    <div><h1>Market Sentinel AI</h1><div class="meta">Operational dashboard</div>
+      <nav class="top-nav" aria-label="Navegación principal">
+        <a class="active" href="/">Centro de control</a>
+        <a href="/analysis">Análisis de predicciones</a>
+      </nav>
+    </div>
     <div class="toolbar"><span class="meta">{escape(environment)} -
       {escape(generated_at_iso)}</span>
       <button type="button" onclick="window.location.reload()">Refresh</button></div>
@@ -452,6 +461,7 @@ def render_operational_dashboard(
         <div class="system-item"><span>Watchlist</span><strong id="live-watchlist">-</strong></div>
         <div class="system-item"><span>Último escaneo</span><strong id="live-scan">-</strong></div>
         <div class="system-item"><span>Cuenta paper</span><strong id="live-equity">-</strong></div>
+        <div class="system-item"><span>Predicciones automáticas</span><strong id="prediction-monitor-status">Cargando</strong></div>
       </div>
     </div></section>
     <section><div class="panel"><h2>Watchlist</h2>
@@ -609,8 +619,8 @@ def render_operational_dashboard(
           <tbody id="sim-positions-rows"><tr><td colspan="9" class="muted">No hay posiciones abiertas.</td></tr></tbody></table>
       </div>
       <div class="simulation-positions"><h3>Historial de simulación</h3>
-        <table><thead><tr><th>Activo</th><th>Dirección</th><th>Entrada</th><th>Salida</th><th>PnL</th><th>Cierre</th></tr></thead>
-          <tbody id="sim-trades-rows"><tr><td colspan="6" class="muted">Aún no hay operaciones cerradas.</td></tr></tbody></table>
+        <table><thead><tr><th>Activo</th><th>Dirección</th><th>Margen</th><th>Apalancamiento</th><th>Entrada</th><th>Salida</th><th>Costes</th><th>PnL</th><th>Motivo</th><th>Cierre</th></tr></thead>
+          <tbody id="sim-trades-rows"><tr><td colspan="10" class="muted">Aún no hay operaciones cerradas.</td></tr></tbody></table>
       </div>
     </div></section>
     <section><div class="panel">
@@ -705,13 +715,14 @@ def render_operational_dashboard(
     }}
 
     async function loadOperationalData() {{
-      const [statusData, summaryData, accountData, metricsData, healthData, modelData, driftData, astraData, tradesData] =
+      const [statusData, summaryData, accountData, metricsData, healthData, modelData, driftData, astraData, tradesData, predictionStatusData] =
         await Promise.all([
           fetchJson('/api/v1/status'), fetchJson('/api/v1/operations/summary'),
           fetchJson('/api/v1/paper/account'), fetchJson('/api/v1/paper/metrics'),
           fetchJson('/api/v1/health/details'), fetchJson('/api/v1/model-status'),
           fetchJson('/api/v1/drift?limit=1'),
-          fetchJson('/api/v1/astra-usage'), fetchJson('/api/v1/paper/trades?limit=50')
+          fetchJson('/api/v1/astra-usage'), fetchJson('/api/v1/paper/trades?limit=50'),
+          fetchJson('/api/v1/predictions/status')
         ]);
       if (statusData) {{
         document.getElementById('live-service').textContent = `${{statusData.release}} · ${{statusData.version}}`;
@@ -776,6 +787,15 @@ def render_operational_dashboard(
             tradeRows.appendChild(row);
           }});
         }}
+      }}
+      if (predictionStatusData) {{
+        const lastRun = predictionStatusData.last_run;
+        const monitorLabel = predictionStatusData.running ? 'Analizando...' : 'Activo';
+        document.getElementById('prediction-monitor-status').textContent =
+          `${{monitorLabel}} · ${{predictionStatusData.pending || 0}} pendientes`;
+        document.getElementById('prediction-monitor-status').title = lastRun ?
+          `Último ciclo: ${{lastRun.generated}} nuevas, ${{lastRun.resolved}} resueltas` :
+          'El primer ciclo se ejecutará al iniciar la aplicación';
       }}
     }}
 
@@ -847,16 +867,20 @@ def render_operational_dashboard(
       const tradesRows = document.getElementById('sim-trades-rows');
       tradesRows.replaceChildren();
       if (!trades || !trades.length) {{
-        tradesRows.innerHTML = '<tr><td colspan="6" class="muted">Aún no hay operaciones cerradas.</td></tr>';
+        tradesRows.innerHTML = '<tr><td colspan="10" class="muted">Aún no hay operaciones cerradas.</td></tr>';
       }} else {{
         trades.slice().reverse().forEach((trade) => {{
           const row = document.createElement('tr');
           appendSimulationCell(row, trade.symbol);
           appendSimulationCell(row, trade.direction, trade.direction === 'LONG' ? 'long' : 'short');
+          appendSimulationCell(row, formatMoneyValue(trade.margin));
+          appendSimulationCell(row, `${{safeText(trade.leverage)}}x`);
           appendSimulationCell(row, formatPrice(trade.entry_price));
           appendSimulationCell(row, formatPrice(trade.exit_price));
+          appendSimulationCell(row, formatMoneyValue((trade.entry_cost || 0) + (trade.exit_cost || 0)));
           appendSimulationCell(row, formatSimulationPnl(trade.pnl),
             trade.pnl >= 0 ? 'simulation-pnl-positive' : 'simulation-pnl-negative');
+          appendSimulationCell(row, safeText(trade.close_reason));
           appendSimulationCell(row, safeText(trade.closed_at));
           tradesRows.appendChild(row);
         }});

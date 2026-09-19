@@ -4,6 +4,23 @@ All notable changes to Market Sentinel AI will be documented in this file.
 
 The project follows semantic versioning once v1.0.0 is reached. Pre-1.0 releases map to the staged roadmap.
 
+## [2.10.0] - 2026-09-19
+
+### Added
+
+- Persisted one prediction per watchlist asset, horizon and completed candle with automatic
+  duplicate prevention.
+- Added a background monitor that resolves due predictions against later provider prices and
+  records direction accuracy, realized return and evaluation status.
+- Added the `/analysis` page and filterable prediction analytics by symbol, timeframe, horizon and
+  status, including overall and per-horizon accuracy, pending counts and average returns.
+- Persisted simulation margin, leverage, notional, entry/exit costs and close reason for every
+  operation, including automatic liquidation.
+
+### Safety
+
+- The monitor produces analytics and paper/simulation records only. It does not place live orders.
+
 ## [2.9.3] - 2026-09-19
 
 ### Fixed

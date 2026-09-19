@@ -11,7 +11,12 @@ from uuid import uuid4
 from market_sentinel_ai.domain.ingestion import IngestionRun
 from market_sentinel_ai.domain.instruments import AssetClass, Instrument, featured_instruments
 from market_sentinel_ai.domain.market import Candle, Timeframe
-from market_sentinel_ai.domain.operations import AlertRecord, SchedulerRunRecord, SignalRecord
+from market_sentinel_ai.domain.operations import (
+    AlertRecord,
+    PredictionEvaluation,
+    SchedulerRunRecord,
+    SignalRecord,
+)
 from market_sentinel_ai.domain.paper import (
     PaperAccountSnapshot,
     PaperPosition,
@@ -75,6 +80,37 @@ CREATE TABLE IF NOT EXISTS signals (
 CREATE INDEX IF NOT EXISTS idx_signals_symbol_created_at
 ON signals(symbol, created_at DESC);
 
+CREATE TABLE IF NOT EXISTS prediction_evaluations (
+    prediction_id TEXT PRIMARY KEY,
+    prediction_key TEXT NOT NULL UNIQUE,
+    symbol TEXT NOT NULL,
+    timeframe TEXT NOT NULL,
+    window TEXT NOT NULL,
+    horizon_minutes INTEGER NOT NULL,
+    generated_at TEXT NOT NULL,
+    reference_time TEXT NOT NULL,
+    reference_price REAL NOT NULL,
+    direction TEXT NOT NULL,
+    probability REAL NOT NULL,
+    confidence REAL NOT NULL,
+    model_name TEXT NOT NULL,
+    expected_return_bps REAL,
+    evaluation_threshold_bps REAL NOT NULL,
+    due_at TEXT NOT NULL,
+    status TEXT NOT NULL,
+    actual_price REAL,
+    actual_return_bps REAL,
+    correct INTEGER,
+    resolved_at TEXT,
+    metadata_json TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_prediction_evaluations_status_due_at
+ON prediction_evaluations(status, due_at);
+
+CREATE INDEX IF NOT EXISTS idx_prediction_evaluations_symbol_window
+ON prediction_evaluations(symbol, window, generated_at DESC);
+
 CREATE TABLE IF NOT EXISTS alerts (
     alert_id TEXT PRIMARY KEY,
     signal_id TEXT NOT NULL,
@@ -120,7 +156,13 @@ CREATE TABLE IF NOT EXISTS paper_trades (
     exit_price REAL NOT NULL,
     pnl REAL NOT NULL,
     opened_at TEXT NOT NULL,
-    closed_at TEXT NOT NULL
+    closed_at TEXT NOT NULL,
+    margin REAL NOT NULL DEFAULT 0,
+    leverage REAL NOT NULL DEFAULT 1,
+    entry_cost REAL NOT NULL DEFAULT 0,
+    exit_cost REAL NOT NULL DEFAULT 0,
+    notional REAL NOT NULL DEFAULT 0,
+    close_reason TEXT NOT NULL DEFAULT 'manual'
 );
 
 CREATE INDEX IF NOT EXISTS idx_paper_trades_account_closed_at
@@ -421,6 +463,116 @@ class SQLiteCandleRepository:
             ).fetchall()
         return [SignalRecord.from_row(row) for row in rows]
 
+    def record_prediction(self, prediction: PredictionEvaluation) -> bool:
+        """Persist one prediction, returning False when its evaluation key already exists."""
+        with closing(self._connect()) as connection, connection:
+            cursor = connection.execute(
+                """
+                INSERT OR IGNORE INTO prediction_evaluations (
+                    prediction_id, prediction_key, symbol, timeframe, window,
+                    horizon_minutes, generated_at, reference_time, reference_price,
+                    direction, probability, confidence, model_name, expected_return_bps,
+                    evaluation_threshold_bps, due_at, status, actual_price,
+                    actual_return_bps, correct, resolved_at, metadata_json
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    prediction.prediction_id,
+                    prediction.prediction_key,
+                    prediction.symbol,
+                    prediction.timeframe,
+                    prediction.window,
+                    prediction.horizon_minutes,
+                    prediction.generated_at.isoformat(),
+                    prediction.reference_time.isoformat(),
+                    prediction.reference_price,
+                    prediction.direction.value,
+                    prediction.probability,
+                    prediction.confidence,
+                    prediction.model_name,
+                    prediction.expected_return_bps,
+                    prediction.evaluation_threshold_bps,
+                    prediction.due_at.isoformat(),
+                    prediction.status,
+                    prediction.actual_price,
+                    prediction.actual_return_bps,
+                    None if prediction.correct is None else int(prediction.correct),
+                    prediction.resolved_at.isoformat() if prediction.resolved_at else None,
+                    json.dumps(prediction.metadata, sort_keys=True),
+                ),
+            )
+        return cursor.rowcount == 1
+
+    def list_predictions(
+        self,
+        *,
+        symbol: str | None = None,
+        timeframe: str | None = None,
+        window: str | None = None,
+        status: str | None = None,
+        limit: int = 500,
+    ) -> list[PredictionEvaluation]:
+        if limit <= 0:
+            raise ValueError("limit must be positive")
+        clauses: list[str] = []
+        values: list[object] = []
+        if symbol:
+            clauses.append("symbol = ?")
+            values.append(symbol.upper())
+        if timeframe:
+            clauses.append("timeframe = ?")
+            values.append(timeframe)
+        if window:
+            clauses.append("window = ?")
+            values.append(window)
+        if status:
+            clauses.append("status = ?")
+            values.append(status)
+        where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+        with closing(self._connect()) as connection:
+            rows = connection.execute(
+                f"""
+                SELECT prediction_id, prediction_key, symbol, timeframe, window,
+                       horizon_minutes, generated_at, reference_time, reference_price,
+                       direction, probability, confidence, model_name, expected_return_bps,
+                       evaluation_threshold_bps, due_at, status, actual_price,
+                       actual_return_bps, correct, resolved_at, metadata_json
+                FROM prediction_evaluations
+                {where}
+                ORDER BY generated_at DESC
+                LIMIT ?
+                """,
+                (*values, limit),
+            ).fetchall()
+        return [PredictionEvaluation.from_row(row) for row in rows]
+
+    def resolve_prediction(
+        self,
+        prediction_id: str,
+        *,
+        actual_price: float,
+        actual_return_bps: float,
+        correct: bool,
+        resolved_at: datetime,
+    ) -> bool:
+        with closing(self._connect()) as connection, connection:
+            cursor = connection.execute(
+                """
+                UPDATE prediction_evaluations
+                SET status = 'resolved', actual_price = ?, actual_return_bps = ?,
+                    correct = ?, resolved_at = ?
+                WHERE prediction_id = ? AND status = 'pending'
+                """,
+                (
+                    actual_price,
+                    actual_return_bps,
+                    int(correct),
+                    resolved_at.isoformat(),
+                    prediction_id,
+                ),
+            )
+        return cursor.rowcount == 1
+
     def record_alert(self, alert: AlertRecord) -> None:
         with closing(self._connect()) as connection, connection:
             connection.execute(
@@ -628,8 +780,9 @@ class SQLiteCandleRepository:
                 """
                 INSERT INTO paper_trades (
                     trade_id, account_id, symbol, direction, quantity, entry_price,
-                    exit_price, pnl, opened_at, closed_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    exit_price, pnl, opened_at, closed_at, margin, leverage,
+                    entry_cost, exit_cost, notional, close_reason
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     record.trade_id,
@@ -642,6 +795,12 @@ class SQLiteCandleRepository:
                     trade.pnl,
                     trade.opened_at.isoformat(),
                     trade.closed_at.isoformat(),
+                    trade.margin,
+                    trade.leverage,
+                    trade.entry_cost,
+                    trade.exit_cost,
+                    trade.notional or trade.quantity * trade.entry_price,
+                    trade.close_reason,
                 ),
             )
 
@@ -652,7 +811,8 @@ class SQLiteCandleRepository:
             rows = connection.execute(
                 """
                 SELECT trade_id, account_id, symbol, direction, quantity, entry_price,
-                       exit_price, pnl, opened_at, closed_at
+                       exit_price, pnl, opened_at, closed_at, margin, leverage,
+                       entry_cost, exit_cost, notional, close_reason
                 FROM paper_trades
                 WHERE account_id = ?
                 ORDER BY closed_at ASC
@@ -673,6 +833,12 @@ class SQLiteCandleRepository:
                     pnl=row["pnl"],
                     opened_at=datetime.fromisoformat(row["opened_at"]),
                     closed_at=datetime.fromisoformat(row["closed_at"]),
+                    margin=row["margin"],
+                    leverage=row["leverage"],
+                    entry_cost=row["entry_cost"],
+                    exit_cost=row["exit_cost"],
+                    notional=row["notional"],
+                    close_reason=row["close_reason"],
                 ),
             )
             for row in rows
@@ -887,6 +1053,35 @@ class SQLiteCandleRepository:
     def _ensure_schema(self) -> None:
         with closing(self._connect()) as connection, connection:
             connection.executescript(SCHEMA)
+            existing_columns = {
+                row["name"]
+                for row in connection.execute("PRAGMA table_info(paper_trades)").fetchall()
+            }
+            migrations = {
+                "margin": "ALTER TABLE paper_trades ADD COLUMN margin REAL NOT NULL DEFAULT 0",
+                "leverage": "ALTER TABLE paper_trades ADD COLUMN leverage REAL NOT NULL DEFAULT 1",
+                "entry_cost": (
+                    "ALTER TABLE paper_trades ADD COLUMN entry_cost REAL NOT NULL DEFAULT 0"
+                ),
+                "exit_cost": (
+                    "ALTER TABLE paper_trades ADD COLUMN exit_cost REAL NOT NULL DEFAULT 0"
+                ),
+                "notional": "ALTER TABLE paper_trades ADD COLUMN notional REAL NOT NULL DEFAULT 0",
+                "close_reason": (
+                    "ALTER TABLE paper_trades ADD COLUMN close_reason TEXT NOT NULL "
+                    "DEFAULT 'manual'"
+                ),
+            }
+            for column, statement in migrations.items():
+                if column not in existing_columns:
+                    connection.execute(statement)
+            connection.execute(
+                """
+                UPDATE paper_trades
+                SET notional = quantity * entry_price
+                WHERE notional = 0
+                """
+            )
             if connection.execute("SELECT COUNT(*) FROM watchlist").fetchone()[0] == 0:
                 for instrument in featured_instruments():
                     connection.execute(

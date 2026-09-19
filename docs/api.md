@@ -19,6 +19,12 @@ The default binding is local-only. The service does not place real orders.
 - \`GET /api/v1/alerts\` lists persisted alert deliveries.
 - GET /api/v1/runs lists scheduler runs.
 - GET /api/v1/operations/summary returns watchlist, signal, alert, scheduler and health counts.
+- POST /api/v1/predictions/run runs one prediction-monitor cycle immediately.
+- GET /api/v1/predictions/status returns the automatic monitor state and pending count.
+- GET /api/v1/predictions lists saved predictions with optional symbol, timeframe, window, status
+  and limit filters. Status is pending or resolved.
+- GET /api/v1/prediction-analytics returns overall, per-horizon and per-symbol counts, accuracy,
+  average expected/actual returns and recent records with the same filters.
 - GET /api/v1/instruments searches the curated instrument universe with optional \`q\`,
   \`asset_class\`, \`limit\` and \`source\` filters. Source can be \`local\`, \`provider\` or
   \`auto\`.
@@ -49,12 +55,14 @@ The default binding is local-only. The service does not place real orders.
   supplied price or the latest provider price.
 - GET /api/v1/simulation/trades lists closed simulation trades; GET /api/v1/simulation/metrics
   returns realized/unrealized/total PnL, VaR/CVaR, exposure, drawdown and performance metrics.
+  Each persisted trade also includes margin, leverage, notional, entry/exit costs and close reason.
 - GET /api/v1/drift lists persisted feature-drift reports.
 - GET /api/v1/health/details runs and persists a database/application health check.
 - GET /api/v1/health/history lists previous health checks.
 - \`POST /api/v1/scan\` ingests the configured market data, produces a risk-gated signal and
   persists the result. The JSON body accepts \`symbol\`, \`timeframe\` and positive \`days\`.
 - \`GET /\` serves the operational dashboard.
+- GET /analysis serves the filterable prediction accuracy dashboard.
 
 ## Scheduler
 

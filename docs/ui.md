@@ -55,6 +55,14 @@ externamente tienen prioridad sobre `.env`.
 - El panel de salud muestra estado del servicio, modelo cuantitativo, drift, uso de Astra y la
   ultima ejecucion. El modelo adaptativo se vuelve a entrenar al detectar una vela nueva durante
   un escaneo; con poco historial se indica `Baseline de respaldo`.
+- El menú superior abre **Análisis de predicciones**. La aplicación guarda automáticamente las
+  predicciones de cada producto y horizonte mientras el servidor está abierto, las compara con el
+  precio real cuando vence cada horizonte y muestra aciertos, fallos, pendientes, mejor horizonte,
+  retorno medio y detalle por producto. Puedes filtrar por símbolo, timeframe, horizonte y estado.
+- El historial de simulación conserva margen, apalancamiento, notional, costes de entrada y salida,
+  PnL y motivo de cierre. El monitor automático se ejecuta en segundo plano cada 30 segundos y
+  evita duplicar una predicción para la misma vela; una predicción nueva aparece al llegar una vela
+  nueva del timeframe correspondiente.
 - La dirección central es la lectura del modelo para el horizonte elegido. La banda futura superior
   e inferior es un rango aproximado calculado con ATR y momentum, no una segunda predicción
   contraria. No es una prediccion garantizada, asesoramiento financiero ni una orden automatica.

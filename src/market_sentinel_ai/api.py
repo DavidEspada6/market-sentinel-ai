@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
+from threading import Event, Thread
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import HTMLResponse
@@ -18,7 +20,7 @@ from market_sentinel_ai.analytics import (
     chart_window_spec,
 )
 from market_sentinel_ai.config import Settings
-from market_sentinel_ai.dashboard import render_operational_dashboard
+from market_sentinel_ai.dashboard import render_operational_dashboard, render_prediction_analytics
 from market_sentinel_ai.domain.instruments import (
     AssetClass,
     Instrument,
@@ -30,7 +32,7 @@ from market_sentinel_ai.domain.market import Timeframe
 from market_sentinel_ai.domain.paper import PaperPosition
 from market_sentinel_ai.domain.prediction import Direction
 from market_sentinel_ai.monitoring import HealthService
-from market_sentinel_ai.operations import MarketScanService, MarketScheduler
+from market_sentinel_ai.operations import MarketScanService, MarketScheduler, PredictionMonitor
 from market_sentinel_ai.paper import SimulationError, SimulationLedger
 from market_sentinel_ai.reasoning import AstraUsageLedger
 from market_sentinel_ai.releases import CURRENT_RELEASE
@@ -104,13 +106,38 @@ def create_app(
     active_settings = settings or Settings.from_env()
     active_service = service or MarketScanService(active_settings)
     repository: SQLiteCandleRepository = active_service.repository
+    prediction_monitor = PredictionMonitor(active_service)
+    monitor_stop = Event()
+    monitor_thread: Thread | None = None
+
+    @asynccontextmanager
+    async def lifespan(_: FastAPI):
+        nonlocal monitor_thread
+        monitor_stop.clear()
+        monitor_thread = Thread(
+            target=prediction_monitor.run_forever,
+            args=(monitor_stop,),
+            kwargs={"interval_seconds": 30},
+            daemon=True,
+            name="market-sentinel-predictions",
+        )
+        monitor_thread.start()
+        try:
+            yield
+        finally:
+            monitor_stop.set()
+            if monitor_thread is not None:
+                monitor_thread.join(timeout=5)
+
     app = FastAPI(
         title="Market Sentinel AI",
         version=CURRENT_RELEASE.version,
         description="Quantitative market analysis API with local paper simulation only.",
+        lifespan=lifespan,
     )
     app.state.scan_service = active_service
     app.state.repository = repository
+    app.state.prediction_monitor = prediction_monitor
 
     def simulation_ledger() -> SimulationLedger:
         return SimulationLedger(
@@ -286,6 +313,112 @@ def create_app(
     @app.get("/api/v1/model-status")
     def model_status() -> list[dict[str, object]]:
         return [dict(item) for item in active_service.model_status()]
+
+    @app.post("/api/v1/predictions/run")
+    def run_predictions() -> dict[str, object]:
+        return prediction_monitor.run_once().to_dict()
+
+    @app.get("/api/v1/predictions/status")
+    def prediction_status() -> dict[str, object]:
+        return prediction_monitor.status()
+
+    @app.get("/api/v1/predictions")
+    def predictions(
+        symbol: str | None = None,
+        timeframe: str | None = None,
+        window: str | None = None,
+        status: str | None = None,
+        limit: int = Query(default=500, ge=1, le=10_000),
+    ) -> list[dict[str, object]]:
+        if status not in {None, "pending", "resolved"}:
+            raise HTTPException(status_code=422, detail="status must be pending or resolved")
+        return [
+            item.to_dict()
+            for item in repository.list_predictions(
+                symbol=symbol,
+                timeframe=timeframe,
+                window=window,
+                status=status,
+                limit=limit,
+            )
+        ]
+
+    @app.get("/api/v1/prediction-analytics")
+    def prediction_analytics(
+        symbol: str | None = None,
+        timeframe: str | None = None,
+        window: str | None = None,
+        status: str | None = None,
+        limit: int = Query(default=5000, ge=1, le=20_000),
+    ) -> dict[str, object]:
+        if status not in {None, "pending", "resolved"}:
+            raise HTTPException(status_code=422, detail="status must be pending or resolved")
+        records = repository.list_predictions(
+            symbol=symbol,
+            timeframe=timeframe,
+            window=window,
+            status=status,
+            limit=limit,
+        )
+        by_window: dict[str, list] = {}
+        by_symbol: dict[str, list] = {}
+        for item in records:
+            by_window.setdefault(item.window, []).append(item)
+            by_symbol.setdefault(item.symbol, []).append(item)
+
+        def aggregate(items: list) -> dict[str, object]:
+            scored = [item for item in items if item.status == "resolved"]
+            wins = sum(1 for item in scored if item.correct is True)
+            returns = [
+                item.actual_return_bps
+                for item in scored
+                if item.actual_return_bps is not None
+            ]
+            expected = [
+                item.expected_return_bps
+                for item in items
+                if item.expected_return_bps is not None
+            ]
+            return {
+                "total": len(items),
+                "pending": len(items) - len(scored),
+                "resolved": len(scored),
+                "correct": wins,
+                "incorrect": len(scored) - wins,
+                "accuracy_pct": (wins / len(scored) * 100) if scored else None,
+                "avg_actual_return_bps": sum(returns) / len(returns) if returns else None,
+                "avg_expected_return_bps": sum(expected) / len(expected) if expected else None,
+            }
+
+        def grouped(items_by_key: dict[str, list]) -> list[dict[str, object]]:
+            return [
+                {"key": key, **aggregate(items)}
+                for key, items in sorted(items_by_key.items())
+            ]
+
+        horizon_rows = grouped(by_window)
+        scored_horizons = [
+            item for item in horizon_rows if item["accuracy_pct"] is not None
+        ]
+        best = (
+            max(scored_horizons, key=lambda item: float(item["accuracy_pct"]))
+            if scored_horizons
+            else None
+        )
+        return {
+            "filters": {
+                "symbol": symbol,
+                "timeframe": timeframe,
+                "window": window,
+                "status": status,
+                "limit": limit,
+            },
+            **aggregate(records),
+            "best_window": best["key"] if best else None,
+            "by_window": horizon_rows,
+            "by_symbol": grouped(by_symbol),
+            "recent": [item.to_dict() for item in records[:100]],
+        }
 
     @app.get("/api/v1/instruments")
     def instruments(
@@ -584,6 +717,12 @@ def create_app(
                 "entry_price": record.trade.entry_price,
                 "exit_price": record.trade.exit_price,
                 "pnl": record.trade.pnl,
+                "margin": record.trade.margin,
+                "leverage": record.trade.leverage,
+                "entry_cost": record.trade.entry_cost,
+                "exit_cost": record.trade.exit_cost,
+                "notional": record.trade.notional,
+                "close_reason": record.trade.close_reason,
                 "opened_at": record.trade.opened_at.isoformat(),
                 "closed_at": record.trade.closed_at.isoformat(),
             }
@@ -670,6 +809,12 @@ def create_app(
                 "entry_price": trade.entry_price,
                 "exit_price": trade.exit_price,
                 "pnl": trade.pnl,
+                "margin": trade.margin,
+                "leverage": trade.leverage,
+                "entry_cost": trade.entry_cost,
+                "exit_cost": trade.exit_cost,
+                "notional": trade.notional,
+                "close_reason": trade.close_reason,
                 "opened_at": trade.opened_at.isoformat(),
                 "closed_at": trade.closed_at.isoformat(),
             },
@@ -690,6 +835,12 @@ def create_app(
                 "entry_price": record.trade.entry_price,
                 "exit_price": record.trade.exit_price,
                 "pnl": record.trade.pnl,
+                "margin": record.trade.margin,
+                "leverage": record.trade.leverage,
+                "entry_cost": record.trade.entry_cost,
+                "exit_cost": record.trade.exit_cost,
+                "notional": record.trade.notional,
+                "close_reason": record.trade.close_reason,
                 "opened_at": record.trade.opened_at.isoformat(),
                 "closed_at": record.trade.closed_at.isoformat(),
             }
@@ -762,5 +913,9 @@ def create_app(
             watchlist=repository.list_watchlist(),
             risk_metrics=metrics,
         )
+
+    @app.get("/analysis", response_class=HTMLResponse)
+    def analysis() -> str:
+        return render_prediction_analytics()
 
     return app

@@ -6,8 +6,9 @@ published tags remain immutable. This completion track closed that scope through
 releases and ended at v2.0.0. The follow-on operational track is documented in
 [operational-roadmap.md](operational-roadmap.md).
 
-The operational track now includes O9, which adds a persistent leveraged simulation account while
-keeping broker execution separate and disabled. Broker execution remains a separate O10 review.
+The operational track now includes O10, which adds continuous prediction evaluation, filterable
+accuracy analytics and detailed simulation history while keeping broker execution separate and
+disabled. Broker execution remains a separate O11 review.
 
 | Release | Version | Deliverable |
 | --- | --- | --- |

@@ -174,13 +174,19 @@ class SimulationLedger:
                     self.position_unrealized_pnl(updated)
                     <= -updated.margin * self.LIQUIDATION_BUFFER
                 ):
-                    self.close_position(updated.position_id, price, timestamp)
+                    self.close_position(
+                        updated.position_id,
+                        price,
+                        timestamp,
+                        close_reason="liquidation",
+                    )
 
     def close_position(
         self,
         position_id: str,
         exit_price: float,
         closed_at: datetime | None = None,
+        close_reason: str = "manual",
     ) -> PaperTrade:
         if exit_price <= 0:
             raise SimulationError("exit_price must be positive")
@@ -201,6 +207,12 @@ class SimulationLedger:
             pnl=pnl,
             opened_at=position.opened_at,
             closed_at=timestamp,
+            margin=position.margin,
+            leverage=position.leverage,
+            entry_cost=position.entry_cost,
+            exit_cost=exit_cost,
+            notional=position.notional,
+            close_reason=close_reason,
         )
         self.positions.remove(position)
         self.trades.append(trade)

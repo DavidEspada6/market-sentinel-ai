@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
+from math import ceil
 from uuid import uuid4
 
 from market_sentinel_ai.adapters.market_data import build_market_data_provider
@@ -50,9 +51,9 @@ class MarketScanService:
         self.provider = provider or build_market_data_provider(settings.market_data)
         self.alert_channel = alert_channel or _build_alert_channel(settings)
         self._adaptive_models: dict[
-            tuple[str, str], tuple[tuple[int, str, float], AdaptiveDirectionalModel]
+            tuple[str, str, int], tuple[tuple[int, str, float, int], AdaptiveDirectionalModel]
         ] = {}
-        self._model_status: dict[tuple[str, str], dict[str, str | float | int | bool]] = {}
+        self._model_status: dict[tuple[str, str, int], dict[str, str | float | int | bool]] = {}
 
     def scan(self, symbol: str, timeframe: Timeframe, days: int = 5) -> ScanResult:
         if not symbol.strip():
@@ -110,24 +111,37 @@ class MarketScanService:
         candles: Sequence[Candle],
         timeframe: Timeframe,
         round_trip_cost_bps: float,
+        horizon_minutes: int | None = None,
     ) -> tuple[Prediction, list[FeatureRow]]:
         """Return the adaptive prediction, falling back transparently when untrainable."""
         if not candles:
             raise ValueError("candles cannot be empty")
         features = OHLCVFeatureEngine().transform(candles)
         candle_minutes = _timeframe_minutes(timeframe)
-        horizon_minutes = candle_minutes * 3
-        key = (candles[-1].symbol, timeframe.value)
-        signature = (len(candles), candles[-1].opened_at.isoformat(), round_trip_cost_bps)
+        requested_horizon = horizon_minutes or candle_minutes * 3
+        if requested_horizon <= 0:
+            raise ValueError("horizon_minutes must be positive")
+        horizon_candles = max(1, ceil(requested_horizon / candle_minutes))
+        key = (candles[-1].symbol, timeframe.value, requested_horizon)
+        signature = (
+            len(candles),
+            candles[-1].opened_at.isoformat(),
+            round_trip_cost_bps,
+            requested_horizon,
+        )
         cached = self._adaptive_models.get(key)
         if cached is None or cached[0] != signature:
-            model = AdaptiveDirectionalModel(horizon_minutes=horizon_minutes)
+            model = AdaptiveDirectionalModel(
+                horizon_minutes=requested_horizon,
+                horizon_candles=horizon_candles,
+            )
             try:
                 model.fit(candles, features, round_trip_cost_bps)
                 self._adaptive_models[key] = (signature, model)
                 self._model_status[key] = {
                     "symbol": candles[-1].symbol,
                     "timeframe": timeframe.value,
+                    "horizon_minutes": requested_horizon,
                     "updated_at": datetime.now(tz=UTC).isoformat(),
                     **model.status,
                 }
@@ -135,6 +149,7 @@ class MarketScanService:
                 self._model_status[key] = {
                     "symbol": candles[-1].symbol,
                     "timeframe": timeframe.value,
+                    "horizon_minutes": requested_horizon,
                     "updated_at": datetime.now(tz=UTC).isoformat(),
                     "status": "fallback",
                     "model": "momentum-baseline",
@@ -154,7 +169,7 @@ class MarketScanService:
 
         if model is not None:
             return model.predict(features), features
-        return MomentumBaselineModel(horizon_minutes=candle_minutes).predict(features), features
+        return MomentumBaselineModel(horizon_minutes=requested_horizon).predict(features), features
 
     def model_status(self) -> list[dict[str, str | float | int | bool]]:
         return [dict(self._model_status[key]) for key in sorted(self._model_status)]

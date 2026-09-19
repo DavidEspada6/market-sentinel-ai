@@ -64,6 +64,12 @@ class PaperTradingLedger:
             pnl=pnl,
             opened_at=opened_at,
             closed_at=closed_at,
+            margin=notional,
+            leverage=1.0,
+            entry_cost=costs / 2,
+            exit_cost=costs / 2,
+            notional=notional,
+            close_reason="signal_horizon",
         )
         self.trades.append(trade)
         self.equity += pnl
