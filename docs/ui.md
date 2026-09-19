@@ -35,6 +35,10 @@ externamente tienen prioridad sobre `.env`.
 - El grafico muestra OHLCV historico, cambio del intervalo, dirección única, predicción central,
   confianza, entrada, objetivo y stop. Entrada, objetivo y stop aparecen como bloques separados
   y coloreados para no confundir sus precios.
+- El cuadro **Por qué el modelo marca esta lectura** explica por qué el activo aparece alcista,
+  bajista o en espera usando momentum, medias, RSI, Bollinger, volumen y advertencias. También
+  explica que la entrada usa el último cierre y cómo el ATR, los costes, el movimiento esperado
+  y el ratio riesgo/beneficio determinan objetivo y stop.
 - El eje inferior muestra la linea temporal. Al pasar el raton por encima del grafico aparece la
   fecha/hora y el precio del punto histórico; en la zona futura muestra la predicción central y
   su rango aproximado.

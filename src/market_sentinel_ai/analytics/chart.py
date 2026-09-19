@@ -121,6 +121,7 @@ def build_market_chart_payload(
     first_close = candles[0].close
     change_pct = ((latest.close - first_close) / first_close) * 100 if first_close else 0.0
     forecast = _build_forecast(candles, signal, plan, feature)
+    explanation = _build_explanation(latest, signal, plan, feature)
     return {
         "symbol": instrument["symbol"],
         "market_symbol": latest.symbol,
@@ -161,6 +162,7 @@ def build_market_chart_payload(
             "reward_risk_ratio": plan.reward_risk_ratio,
             "valid_until": plan.valid_until_iso,
         },
+        "explanation": explanation,
         "forecast": forecast,
         "disclaimer": (
             (
@@ -176,6 +178,194 @@ def build_market_chart_payload(
             + " No es una garantía ni una orden de inversión."
         ),
     }
+
+
+def _build_explanation(
+    candle: Candle,
+    signal: Signal,
+    plan: TradePlan,
+    feature: FeatureRow,
+) -> dict[str, object]:
+    values = feature.values
+    direction = signal.prediction.direction
+    momentum = float(values.get("rolling_return_mean_bps", 0.0))
+    ema_cross = float(values.get("ema_cross_bps", 0.0))
+    ema_slope = float(values.get("ema_cross_slope_bps", 0.0))
+    rsi = float(values.get("rsi", 50.0))
+    bollinger = float(values.get("bollinger_position", 0.5))
+    volume_zscore = float(values.get("volume_zscore", 0.0))
+    atr_bps = max(float(values.get("atr_bps", 0.0)), 1.0)
+    expected = signal.prediction.expected_return_bps
+
+    drivers: list[str] = []
+    warnings: list[str] = []
+    if direction is Direction.LONG:
+        bias_word = "alcista"
+        _append_directional_driver(
+            drivers,
+            warnings,
+            momentum,
+            "El momentum medio es positivo ({value:+.1f} bps), a favor de la subida.",
+            "El momentum medio es negativo ({value:+.1f} bps), en contra de la subida.",
+            "El momentum es débil ({value:+.1f} bps) y aporta poca confirmación.",
+            supports_positive=True,
+        )
+        _append_directional_driver(
+            drivers,
+            warnings,
+            ema_cross,
+            "La EMA rápida está por encima de la lenta ({value:+.1f} bps).",
+            "La EMA rápida está por debajo de la lenta ({value:+.1f} bps).",
+            "Las medias están prácticamente cruzadas ({value:+.1f} bps).",
+            supports_positive=True,
+        )
+        if rsi >= 55:
+            drivers.append(f"El RSI está en {rsi:.1f}, compatible con presión compradora.")
+        else:
+            warnings.append(
+                f"El RSI está en {rsi:.1f}, por debajo de 55 y sin confirmación alcista fuerte."
+            )
+        if bollinger >= 0.55:
+            drivers.append(
+                f"El precio ocupa {bollinger:.0%} del canal de Bollinger, en la mitad superior."
+            )
+        else:
+            warnings.append(
+                f"El precio ocupa {bollinger:.0%} del canal de Bollinger, todavía en la "
+                "mitad inferior."
+            )
+        if rsi > 70:
+            warnings.append("El RSI está sobrecomprado; la subida puede estar extendida.")
+    elif direction is Direction.SHORT:
+        bias_word = "bajista"
+        _append_directional_driver(
+            drivers,
+            warnings,
+            momentum,
+            "El momentum medio es negativo ({value:+.1f} bps), a favor de la bajada.",
+            "El momentum medio es positivo ({value:+.1f} bps), en contra de la bajada.",
+            "El momentum es débil ({value:+.1f} bps) y aporta poca confirmación.",
+            supports_positive=False,
+        )
+        _append_directional_driver(
+            drivers,
+            warnings,
+            ema_cross,
+            "La EMA rápida está por debajo de la lenta ({value:+.1f} bps).",
+            "La EMA rápida está por encima de la lenta ({value:+.1f} bps).",
+            "Las medias están prácticamente cruzadas ({value:+.1f} bps).",
+            supports_positive=False,
+        )
+        if rsi <= 45:
+            drivers.append(f"El RSI está en {rsi:.1f}, compatible con presión vendedora.")
+        else:
+            warnings.append(
+                f"El RSI está en {rsi:.1f}, por encima de 45 y sin confirmación bajista fuerte."
+            )
+        if bollinger <= 0.45:
+            drivers.append(
+                f"El precio ocupa {bollinger:.0%} del canal de Bollinger, en la mitad inferior."
+            )
+        else:
+            warnings.append(
+                f"El precio ocupa {bollinger:.0%} del canal de Bollinger, todavía en la "
+                "mitad superior."
+            )
+        if rsi < 30:
+            warnings.append("El RSI está sobrevendido; la bajada puede estar extendida.")
+    else:
+        bias_word = "indefinido"
+        drivers.append("El modelo no reúne suficiente ventaja direccional después de costes.")
+        if abs(momentum) >= 0.5:
+            drivers.append(
+                f"Hay momentum ({momentum:+.1f} bps), pero no supera todos los filtros de entrada."
+            )
+        if abs(ema_cross) >= 1.0:
+            drivers.append(
+                f"Las medias muestran una separación de {ema_cross:+.1f} bps, con señal "
+                "no concluyente."
+            )
+        warnings.append("La lectura correcta es esperar; no se fuerza una compra ni una venta.")
+
+    if volume_zscore >= 0.5:
+        drivers.append(
+            f"El volumen está por encima de su media (z-score {volume_zscore:+.1f}), "
+            "dando más participación al movimiento."
+        )
+    elif volume_zscore <= -0.5:
+        warnings.append(
+            f"El volumen está por debajo de su media (z-score {volume_zscore:+.1f}); "
+            "la señal tiene menor confirmación."
+        )
+    if abs(ema_slope) >= 0.5:
+        drivers.append(f"La pendiente reciente del cruce de medias es {ema_slope:+.1f} bps.")
+    if not drivers:
+        drivers.append(
+            "No hay indicadores suficientes para explicar una ventaja direccional clara."
+        )
+
+    probability = signal.prediction.probability * 100
+    expected_text = "sin estimación de retorno"
+    if expected is not None:
+        expected_text = f"retorno esperado {expected:+.1f} bps"
+    if direction is Direction.NO_TRADE:
+        summary = (
+            f"Lectura {bias_word.upper()}: el modelo tiene {probability:.1f}% de probabilidad y "
+            f"{expected_text}; la combinación no alcanza el umbral operativo."
+        )
+    else:
+        summary = (
+            f"Lectura {bias_word.upper()}: el modelo combina momentum, medias, RSI y volatilidad "
+            f"con {probability:.1f}% de probabilidad y {expected_text}."
+        )
+
+    if plan.entry_price is None:
+        level_explanations = [
+            "No hay entrada ni objetivo propuestos porque la señal está en ESPERAR.",
+            "La volatilidad actual (ATR) es de aproximadamente "
+            f"{atr_bps:.1f} bps, pero no se convierte en una orden sin dirección suficiente.",
+        ]
+    else:
+        risk_bps = plan.risk_bps or 0.0
+        reward_bps = plan.reward_bps or 0.0
+        ratio = plan.reward_risk_ratio or 0.0
+        direction_word = "por encima" if direction is Direction.LONG else "por debajo"
+        level_explanations = [
+            f"Entrada {plan.entry_price:.6f}: usa el último cierre confirmado "
+            f"({candle.opened_at.isoformat()}).",
+            f"Objetivo {plan.take_profit_price:.6f}: se coloca {direction_word} de la entrada "
+            f"con {reward_bps:.1f} bps de recorrido y ratio riesgo/beneficio {ratio:.2f}.",
+            f"Stop {plan.stop_loss_price:.6f}: usa {risk_bps:.1f} bps de riesgo, basado "
+            f"principalmente en 1.5x ATR ({atr_bps:.1f} bps) y el coste estimado.",
+            f"El plan deja de ser válido aproximadamente en {plan.valid_until_iso}; los precios "
+            "son niveles de referencia, no ejecuciones garantizadas.",
+        ]
+    return {
+        "summary": summary,
+        "drivers": drivers[:6],
+        "warnings": warnings[:4],
+        "levels": level_explanations,
+    }
+
+
+def _append_directional_driver(
+    drivers: list[str],
+    warnings: list[str],
+    value: float,
+    positive_text: str,
+    negative_text: str,
+    neutral_text: str,
+    *,
+    supports_positive: bool,
+) -> None:
+    supports = value >= 0.5 if supports_positive else value <= -0.5
+    opposes = value <= -0.5 if supports_positive else value >= 0.5
+    if supports:
+        drivers.append(positive_text.format(value=value))
+    elif opposes:
+        warnings.append(negative_text.format(value=value))
+    else:
+        warnings.append(neutral_text.format(value=value))
 
 
 def _candle_to_dict(candle: Candle) -> dict[str, object]:

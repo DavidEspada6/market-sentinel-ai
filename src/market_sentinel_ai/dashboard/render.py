@@ -382,12 +382,25 @@ def render_operational_dashboard(
       padding: 10px 12px; margin-bottom: 12px; font-size: 13px; font-weight: 600; }}
     .decision-note.long {{ border-left-color: var(--green); background: #e1f4e8; color: #166534; }}
     .decision-note.short {{ border-left-color: var(--red); background: #fde8e7; color: #991b1b; }}
+    .explanation-box {{ border: 1px solid var(--line); border-left: 4px solid var(--amber);
+      background: #fffdf7; padding: 12px 14px; margin-bottom: 12px; }}
+    .explanation-box.long {{ border-left-color: var(--green); background: #f5fcf6; }}
+    .explanation-box.short {{ border-left-color: var(--red); background: #fff7f6; }}
+    .explanation-box h3 {{ font-size: 14px; margin: 0 0 5px; }}
+    .explanation-box p {{ margin: 0; font-size: 13px; line-height: 1.45; }}
+    .explanation-grid {{ display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px; margin-top: 12px; }}
+    .explanation-column > span {{ color: var(--muted); font-size: 11px; font-weight: 800;
+      text-transform: uppercase; }}
+    .explanation-column ul {{ margin: 6px 0 0; padding-left: 18px; font-size: 12px; line-height: 1.5; }}
+    .explanation-warnings {{ color: #72520f; margin-top: 10px !important; }}
     .market-empty {{ color: var(--muted); padding: 70px 16px; text-align: center; }}
     @media (max-width: 760px) {{ header {{ align-items: flex-start; flex-direction: column; }}
       main {{ padding: 14px; }} .summary {{ grid-template-columns: 1fr; }}
       .panel {{ overflow-x: auto; }} table {{ min-width: 680px; }}
       .market-heading {{ flex-direction: column; }} .market-badges {{ justify-content: flex-start; }}
       .chart-summary, .trade-levels {{ grid-template-columns: repeat(2, minmax(0, 1fr)); }}
+      .explanation-grid {{ grid-template-columns: 1fr; }}
       .window-buttons {{ min-width: 620px; }} .system-grid, .risk-grid, .simulation-account-grid {{ grid-template-columns: repeat(2, minmax(0, 1fr)); }}
       .data-layout {{ grid-template-columns: 1fr; }} .diagnostic-grid {{ grid-template-columns: 1fr; }} }}
   </style>
@@ -496,6 +509,17 @@ def render_operational_dashboard(
       </div>
       <div class="decision-note" id="market-decision" aria-live="polite">
         Selecciona un activo para obtener una lectura direccional.
+      </div>
+      <div class="explanation-box" id="market-explanation">
+        <h3>Por qué el modelo marca esta lectura</h3>
+        <p id="explanation-summary">Selecciona un activo para ver los factores cuantitativos que pesan en la decisión.</p>
+        <div class="explanation-grid">
+          <div class="explanation-column"><span>Indicadores que pesan</span>
+            <ul id="explanation-drivers"><li>Aún no hay datos de análisis.</li></ul></div>
+          <div class="explanation-column"><span>Entrada, objetivo y stop</span>
+            <ul id="explanation-levels"><li>Aún no hay un plan para este activo.</li></ul></div>
+        </div>
+        <ul class="explanation-warnings" id="explanation-warnings"><li>La explicación aparecerá al cargar datos frescos.</li></ul>
       </div>
       <div class="chart-wrap"><canvas id="market-chart" height="340" aria-label="Gráfico de mercado"></canvas>
         <div id="chart-tooltip" class="chart-tooltip" role="status" hidden></div>
@@ -627,6 +651,11 @@ def render_operational_dashboard(
     const marketEmpty = document.getElementById('market-empty');
     const marketDisclaimer = document.getElementById('market-disclaimer');
     const marketDecision = document.getElementById('market-decision');
+    const marketExplanation = document.getElementById('market-explanation');
+    const explanationSummary = document.getElementById('explanation-summary');
+    const explanationDrivers = document.getElementById('explanation-drivers');
+    const explanationLevels = document.getElementById('explanation-levels');
+    const explanationWarnings = document.getElementById('explanation-warnings');
     const forecastLabel = document.getElementById('forecast-label');
     const defaultSymbol = "{escape(default_symbol)}";
     let selectedSymbol = defaultSymbol;
@@ -887,6 +916,24 @@ def render_operational_dashboard(
       document.getElementById('level-stop').textContent = formatPrice(levels.stop);
     }}
 
+    function renderExplanation(payload) {{
+      const explanation = payload.explanation || {{}};
+      const direction = (payload.signal || {{}}).direction || 'NO_TRADE';
+      const directionClass = direction === 'LONG' ? 'long' : direction === 'SHORT' ? 'short' : '';
+      marketExplanation.className = 'explanation-box ' + directionClass;
+      explanationSummary.textContent = explanation.summary || 'No hay explicación disponible.';
+      function renderList(list, values, fallback) {{
+        list.replaceChildren();
+        const items = Array.isArray(values) && values.length ? values : [fallback];
+        items.forEach((value) => {{
+          const item = document.createElement('li'); item.textContent = safeText(value); list.appendChild(item);
+        }});
+      }}
+      renderList(explanationDrivers, explanation.drivers, 'Sin indicadores explicativos disponibles.');
+      renderList(explanationLevels, explanation.levels, 'Sin niveles de operación propuestos.');
+      renderList(explanationWarnings, explanation.warnings, 'Sin advertencias adicionales; revisa siempre el rango de incertidumbre.');
+    }}
+
     function drawMarketChart(payload, hoverIndex = chartHoverIndex) {{
       const historical = payload.candles || [];
       const future = (payload.forecast && payload.forecast.center) || [];
@@ -1135,7 +1182,7 @@ def render_operational_dashboard(
         payload.source === 'provider' ? `DATOS EN VIVO · ${{payload.provider}}` :
         `CACHÉ · ${{payload.provider}}`;
       marketSource.className = 'pill ' + (sourceIsDemo ? 'demo' : '');
-      setSummary(payload); marketDisclaimer.textContent = payload.disclaimer;
+      setSummary(payload); renderExplanation(payload); marketDisclaimer.textContent = payload.disclaimer;
       marketCanvas.style.display = 'block'; marketEmpty.style.display = 'none'; drawMarketChart(payload);
     }}
 
