@@ -7,7 +7,6 @@ from datetime import UTC, datetime, timedelta
 
 from market_sentinel_ai.domain.market import Candle, Timeframe
 
-
 _TIMEFRAME_MINUTES: dict[Timeframe, int] = {
     Timeframe.ONE_MINUTE: 1,
     Timeframe.FIVE_MINUTES: 5,
@@ -19,6 +18,10 @@ _TIMEFRAME_MINUTES: dict[Timeframe, int] = {
 
 class DemoMarketDataProvider:
     """Deterministic synthetic OHLCV data for tests, demos and local development."""
+
+    @property
+    def provider_name(self) -> str:
+        return "demo"
 
     def historical_candles(
         self,

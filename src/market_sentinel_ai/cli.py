@@ -2,16 +2,27 @@ from __future__ import annotations
 
 import argparse
 import json
+from dataclasses import asdict, replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-from market_sentinel_ai.adapters.market_data import DemoMarketDataProvider, DemoOrderBookProvider
+from market_sentinel_ai.adapters.market_data import (
+    DemoMarketDataProvider,
+    DemoOrderBookProvider,
+    build_market_data_provider,
+)
 from market_sentinel_ai.alerts import DryRunAlertChannel
 from market_sentinel_ai.backtesting import SimpleBacktestEngine
 from market_sentinel_ai.config import Settings
 from market_sentinel_ai.dashboard import DashboardViewModel, render_dashboard
 from market_sentinel_ai.domain.market import Timeframe
-from market_sentinel_ai.features import OHLCVFeatureEngine, OrderFlowFeatureEngine, aggregate_candles
+from market_sentinel_ai.domain.risk import RiskLimits
+from market_sentinel_ai.features import (
+    OHLCVFeatureEngine,
+    OrderFlowFeatureEngine,
+    aggregate_candles,
+)
+from market_sentinel_ai.ingestion import MarketDataIngestionService
 from market_sentinel_ai.ml import WalkForwardEvaluator, WalkForwardSplit, build_directional_examples
 from market_sentinel_ai.models import (
     LogisticDirectionalModel,
@@ -21,12 +32,16 @@ from market_sentinel_ai.models import (
 )
 from market_sentinel_ai.monitoring import FeatureDriftDetector, JsonlEventLogger
 from market_sentinel_ai.paper import PaperTradingLedger
+from market_sentinel_ai.reasoning import (
+    AstraCostPolicy,
+    AstraReasoningProvider,
+    ReasoningCache,
+    ReasoningGateway,
+)
 from market_sentinel_ai.regime import VolatilityRegimeDetector
-from market_sentinel_ai.domain.risk import RiskLimits
-from market_sentinel_ai.releases import CURRENT_RELEASE, RELEASE_PLAN
+from market_sentinel_ai.releases import COMPLETION_PLAN, CURRENT_RELEASE, RELEASE_PLAN
 from market_sentinel_ai.signals import SignalEngine
 from market_sentinel_ai.storage import SQLiteCandleRepository, sqlite_path_from_url
-from market_sentinel_ai.reasoning import AstraCostPolicy, AstraReasoningProvider, ReasoningCache, ReasoningGateway
 
 
 def main() -> None:
@@ -39,9 +54,24 @@ def main() -> None:
     ingest.add_argument("--timeframe", choices=[item.value for item in Timeframe], default="5m")
     ingest.add_argument("--days", type=int, default=5)
 
+    provider_ingest = subparsers.add_parser("ingest")
+    provider_ingest.add_argument(
+        "--provider", choices=["demo", "yahoo", "stooq", "alpha_vantage"]
+    )
+    provider_ingest.add_argument("--symbol", default="SPY")
+    provider_ingest.add_argument(
+        "--timeframe", choices=[item.value for item in Timeframe], default="1d"
+    )
+    provider_ingest.add_argument("--days", type=int, default=365)
+
+    ingestion_runs = subparsers.add_parser("ingestion-runs")
+    ingestion_runs.add_argument("--limit", type=int, default=20)
+
     list_candles = subparsers.add_parser("list-candles")
     list_candles.add_argument("--symbol", default="SPY")
-    list_candles.add_argument("--timeframe", choices=[item.value for item in Timeframe], default="5m")
+    list_candles.add_argument(
+        "--timeframe", choices=[item.value for item in Timeframe], default="5m"
+    )
     list_candles.add_argument("--days", type=int, default=5)
 
     backtest = subparsers.add_parser("backtest-demo")
@@ -51,7 +81,9 @@ def main() -> None:
 
     walk_forward = subparsers.add_parser("walk-forward-demo")
     walk_forward.add_argument("--symbol", default="SPY")
-    walk_forward.add_argument("--timeframe", choices=[item.value for item in Timeframe], default="5m")
+    walk_forward.add_argument(
+        "--timeframe", choices=[item.value for item in Timeframe], default="5m"
+    )
     walk_forward.add_argument("--days", type=int, default=30)
     walk_forward.add_argument("--train-size", type=int, default=500)
     walk_forward.add_argument("--test-size", type=int, default=100)
@@ -95,6 +127,18 @@ def main() -> None:
         return
     if command == "demo-ingest":
         _demo_ingest(settings, args.symbol, Timeframe(args.timeframe), args.days)
+        return
+    if command == "ingest":
+        _provider_ingest(
+            settings,
+            args.symbol,
+            Timeframe(args.timeframe),
+            args.days,
+            args.provider,
+        )
+        return
+    if command == "ingestion-runs":
+        _list_ingestion_runs(settings, args.limit)
         return
     if command == "list-candles":
         _list_candles(settings, args.symbol, Timeframe(args.timeframe), args.days)
@@ -141,23 +185,44 @@ def _print_status(settings: Settings) -> None:
         "current_release": CURRENT_RELEASE.code,
         "current_version": CURRENT_RELEASE.version,
         "planned_releases": [release.code for release in RELEASE_PLAN],
+        "completion_releases": [release.code for release in COMPLETION_PLAN],
     }
     print(json.dumps(payload, indent=2, sort_keys=True))
 
 
 def _demo_ingest(settings: Settings, symbol: str, timeframe: Timeframe, days: int) -> None:
+    _provider_ingest(settings, symbol, timeframe, days, "demo")
+
+
+def _provider_ingest(
+    settings: Settings,
+    symbol: str,
+    timeframe: Timeframe,
+    days: int,
+    provider_name: str | None,
+) -> None:
+    if days <= 0:
+        raise ValueError("days must be positive")
     end = datetime.now(tz=UTC).replace(second=0, microsecond=0)
     start = end - timedelta(days=days)
     repository = SQLiteCandleRepository(sqlite_path_from_url(settings.database_url))
-    provider = DemoMarketDataProvider()
-    candles = list(provider.historical_candles(symbol, timeframe, start, end))
-    accepted = repository.upsert_many(candles)
+    market_data_settings = settings.market_data
+    if provider_name is not None:
+        market_data_settings = replace(market_data_settings, provider=provider_name)
+    provider = build_market_data_provider(market_data_settings)
+    result = MarketDataIngestionService(provider, repository).ingest(
+        symbol, timeframe, start, end
+    )
     print(
         json.dumps(
             {
-                "symbol": symbol.upper(),
-                "timeframe": timeframe.value,
-                "accepted": accepted,
+                "run_id": result.run.run_id,
+                "provider": result.run.provider,
+                "symbol": result.run.symbol,
+                "timeframe": result.run.timeframe,
+                "fetched_rows": result.run.fetched_rows,
+                "stored_rows": result.run.stored_rows,
+                "quality": asdict(result.quality),
                 "stored_total": repository.count(),
                 "database_url": settings.database_url,
             },
@@ -239,6 +304,41 @@ def _walk_forward_demo(
         model_factory=lambda: LogisticDirectionalModel(horizon_minutes=5, epochs=100),
         splitter=WalkForwardSplit(train_size=train_size, test_size=test_size),
     )
+    report = evaluator.evaluate(examples)
+    print(
+        json.dumps(
+            {
+                "folds": len(report.folds),
+                "average_accuracy": report.average_accuracy,
+                "average_precision": report.average_precision,
+                "average_recall": report.average_recall,
+                "average_coverage": report.average_coverage,
+            },
+            indent=2,
+            sort_keys=True,
+        )
+    )
+
+
+def _list_ingestion_runs(settings: Settings, limit: int) -> None:
+    repository = SQLiteCandleRepository(sqlite_path_from_url(settings.database_url))
+    runs = repository.list_ingestion_runs(limit)
+    payload = [
+        {
+            "run_id": run.run_id,
+            "provider": run.provider,
+            "symbol": run.symbol,
+            "timeframe": run.timeframe,
+            "status": run.status,
+            "fetched_rows": run.fetched_rows,
+            "stored_rows": run.stored_rows,
+            "finished_at": run.finished_at.isoformat(),
+            "quality": json.loads(run.quality_json),
+            "error": run.error,
+        }
+        for run in runs
+    ]
+    print(json.dumps(payload, indent=2, sort_keys=True))
 
 
 def _signals_demo(settings: Settings, symbol: str, timeframe: Timeframe, days: int) -> None:
@@ -317,7 +417,9 @@ def _demo_signal(settings: Settings, symbol: str, timeframe: Timeframe, days: in
     feature_engine = OHLCVFeatureEngine(rolling_window=20)
     candles = list(provider.historical_candles(symbol, timeframe, start, end))
     features = feature_engine.transform(candles)
-    prediction = MomentumBaselineModel(horizon_minutes=5, momentum_threshold_bps=0.5).predict(features)
+    prediction = MomentumBaselineModel(
+        horizon_minutes=5, momentum_threshold_bps=0.5
+    ).predict(features)
     return SignalEngine(
         min_probability=0.52,
         min_expected_return_bps=settings.risk.default_fee_bps + settings.risk.default_slippage_bps,
@@ -337,7 +439,10 @@ def _ensemble_demo(symbol: str, timeframe: Timeframe, days: int) -> None:
     logistic.fit(examples[:-1])
     ensemble = WeightedEnsembleModel(
         models=(
-            WeightedModel(MomentumBaselineModel(horizon_minutes=5, momentum_threshold_bps=0.5), 0.4),
+            WeightedModel(
+                MomentumBaselineModel(horizon_minutes=5, momentum_threshold_bps=0.5),
+                0.4,
+            ),
             WeightedModel(logistic, 0.6),
         ),
         horizon_minutes=5,

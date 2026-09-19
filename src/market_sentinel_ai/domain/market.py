@@ -25,10 +25,15 @@ class Candle:
     volume: float
 
     def __post_init__(self) -> None:
+        if self.opened_at.tzinfo is None or self.opened_at.utcoffset() is None:
+            raise ValueError("opened_at must be timezone-aware")
+        if min(self.open, self.high, self.low, self.close) <= 0:
+            raise ValueError("OHLC prices must be positive")
+        if self.high < self.low:
+            raise ValueError("high cannot be below low")
         if self.high < max(self.open, self.close):
             raise ValueError("high must be at least open and close")
         if self.low > min(self.open, self.close):
             raise ValueError("low must be at most open and close")
         if self.volume < 0:
             raise ValueError("volume cannot be negative")
-

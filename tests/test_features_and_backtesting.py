@@ -45,7 +45,9 @@ class FeatureAndBacktestTests(unittest.TestCase):
 
     def test_baseline_goes_long_on_positive_momentum(self) -> None:
         rows = OHLCVFeatureEngine(rolling_window=3).transform(_trend_candles(8, 0.2))
-        prediction = MomentumBaselineModel(horizon_minutes=5, momentum_threshold_bps=1).predict(rows)
+        prediction = MomentumBaselineModel(
+            horizon_minutes=5, momentum_threshold_bps=1
+        ).predict(rows)
 
         self.assertEqual(prediction.direction, Direction.LONG)
         self.assertGreater(prediction.probability, 0.5)
@@ -69,4 +71,3 @@ class FeatureAndBacktestTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

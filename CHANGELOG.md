@@ -4,6 +4,23 @@ All notable changes to Market Sentinel AI will be documented in this file.
 
 The project follows semantic versioning once v1.0.0 is reached. Pre-1.0 releases map to the staged roadmap.
 
+## [1.1.0] - 2026-09-19
+
+### Added
+
+- Added Yahoo Finance and Stooq no-key adapters plus an Alpha Vantage historical/intraday adapter.
+- Added a provider factory configured entirely through environment variables.
+- Added an ingestion service with quality gates and persistent provenance records.
+- Added data-quality reporting for duplicates, ordering, intraday gaps and staleness.
+- Added generic `ingest` and `ingestion-runs` CLI commands.
+- Added mocked provider contract tests that do not require network access or credentials.
+
+### Changed
+
+- Strengthened candle validation for timezone-aware timestamps and valid positive OHLC prices.
+- Added Ruff linting to CI.
+- Documented the completion track from v1.1.0 to the final v2.0.0 release.
+
 ## [1.0.0] - 2026-09-19
 
 ### Added

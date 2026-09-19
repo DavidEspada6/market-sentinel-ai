@@ -6,7 +6,6 @@ from datetime import datetime
 
 from market_sentinel_ai.domain.market import Candle, Timeframe
 
-
 _MINUTES: dict[Timeframe, int] = {
     Timeframe.ONE_MINUTE: 1,
     Timeframe.FIVE_MINUTES: 5,
@@ -38,7 +37,10 @@ def aggregate_candles(candles: Sequence[Candle], target_timeframe: Timeframe) ->
             Candle(
                 symbol=group[0].symbol,
                 timeframe=target_timeframe,
-                opened_at=datetime.fromtimestamp(bucket * target_minutes * 60, tz=group[0].opened_at.tzinfo),
+                opened_at=datetime.fromtimestamp(
+                    bucket * target_minutes * 60,
+                    tz=group[0].opened_at.tzinfo,
+                ),
                 open=group[0].open,
                 high=max(candle.high for candle in group),
                 low=min(candle.low for candle in group),
@@ -47,4 +49,3 @@ def aggregate_candles(candles: Sequence[Candle], target_timeframe: Timeframe) ->
             )
         )
     return aggregated
-

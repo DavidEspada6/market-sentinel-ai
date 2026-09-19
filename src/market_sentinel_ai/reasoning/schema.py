@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-
 ASTRA_REASONING_JSON_SCHEMA = {
     "type": "object",
     "additionalProperties": False,

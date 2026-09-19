@@ -6,8 +6,8 @@ from contextlib import closing
 from datetime import datetime
 from pathlib import Path
 
+from market_sentinel_ai.domain.ingestion import IngestionRun
 from market_sentinel_ai.domain.market import Candle, Timeframe
-
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS candles (
@@ -24,6 +24,25 @@ CREATE TABLE IF NOT EXISTS candles (
 
 CREATE INDEX IF NOT EXISTS idx_candles_symbol_timeframe_opened_at
 ON candles(symbol, timeframe, opened_at);
+
+CREATE TABLE IF NOT EXISTS ingestion_runs (
+    run_id TEXT PRIMARY KEY,
+    provider TEXT NOT NULL,
+    symbol TEXT NOT NULL,
+    timeframe TEXT NOT NULL,
+    requested_start TEXT NOT NULL,
+    requested_end TEXT NOT NULL,
+    started_at TEXT NOT NULL,
+    finished_at TEXT NOT NULL,
+    status TEXT NOT NULL,
+    fetched_rows INTEGER NOT NULL,
+    stored_rows INTEGER NOT NULL,
+    quality_json TEXT NOT NULL,
+    error TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_ingestion_runs_finished_at
+ON ingestion_runs(finished_at DESC);
 """
 
 
@@ -50,10 +69,9 @@ class SQLiteCandleRepository:
         if not records:
             return 0
 
-        with closing(self._connect()) as connection:
-            with connection:
-                connection.executemany(
-                    """
+        with closing(self._connect()) as connection, connection:
+            connection.executemany(
+                """
                     INSERT INTO candles (
                         symbol, timeframe, opened_at, open, high, low, close, volume
                     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -64,8 +82,8 @@ class SQLiteCandleRepository:
                         close = excluded.close,
                         volume = excluded.volume
                     """,
-                    records,
-                )
+                records,
+            )
         return len(records)
 
     def list_candles(
@@ -108,10 +126,70 @@ class SQLiteCandleRepository:
             row = connection.execute("SELECT COUNT(*) AS count FROM candles").fetchone()
         return int(row["count"])
 
-    def _ensure_schema(self) -> None:
+    def record_ingestion_run(self, run: IngestionRun) -> None:
+        with closing(self._connect()) as connection, connection:
+            connection.execute(
+                """
+                    INSERT INTO ingestion_runs (
+                        run_id, provider, symbol, timeframe, requested_start, requested_end,
+                        started_at, finished_at, status, fetched_rows, stored_rows,
+                        quality_json, error
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                (
+                    run.run_id,
+                    run.provider,
+                    run.symbol,
+                    run.timeframe,
+                    run.requested_start.isoformat(),
+                    run.requested_end.isoformat(),
+                    run.started_at.isoformat(),
+                    run.finished_at.isoformat(),
+                    run.status,
+                    run.fetched_rows,
+                    run.stored_rows,
+                    run.quality_json,
+                    run.error,
+                ),
+            )
+
+    def list_ingestion_runs(self, limit: int = 20) -> list[IngestionRun]:
+        if limit <= 0:
+            raise ValueError("limit must be positive")
         with closing(self._connect()) as connection:
-            with connection:
-                connection.executescript(SCHEMA)
+            rows = connection.execute(
+                """
+                SELECT run_id, provider, symbol, timeframe, requested_start, requested_end,
+                       started_at, finished_at, status, fetched_rows, stored_rows,
+                       quality_json, error
+                FROM ingestion_runs
+                ORDER BY finished_at DESC
+                LIMIT ?
+                """,
+                (limit,),
+            ).fetchall()
+        return [
+            IngestionRun(
+                run_id=row["run_id"],
+                provider=row["provider"],
+                symbol=row["symbol"],
+                timeframe=row["timeframe"],
+                requested_start=datetime.fromisoformat(row["requested_start"]),
+                requested_end=datetime.fromisoformat(row["requested_end"]),
+                started_at=datetime.fromisoformat(row["started_at"]),
+                finished_at=datetime.fromisoformat(row["finished_at"]),
+                status=row["status"],
+                fetched_rows=row["fetched_rows"],
+                stored_rows=row["stored_rows"],
+                quality_json=row["quality_json"],
+                error=row["error"],
+            )
+            for row in rows
+        ]
+
+    def _ensure_schema(self) -> None:
+        with closing(self._connect()) as connection, connection:
+            connection.executescript(SCHEMA)
 
     def _connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(self.database_path)

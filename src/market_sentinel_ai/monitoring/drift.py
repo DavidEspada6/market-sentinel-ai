@@ -18,7 +18,11 @@ class FeatureDriftDetector:
     def __init__(self, threshold: float = 2.5) -> None:
         self.threshold = threshold
 
-    def compare(self, reference: Sequence[FeatureRow], current: Sequence[FeatureRow]) -> DriftReport:
+    def compare(
+        self,
+        reference: Sequence[FeatureRow],
+        current: Sequence[FeatureRow],
+    ) -> DriftReport:
         if not reference or not current:
             return DriftReport(drifted=False, scores={}, threshold=self.threshold)
 
@@ -44,4 +48,3 @@ def _std(values: Sequence[float]) -> float:
         return 0.0
     average = sum(values) / len(values)
     return math.sqrt(sum((value - average) ** 2 for value in values) / len(values))
-

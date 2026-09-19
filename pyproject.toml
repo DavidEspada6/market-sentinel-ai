@@ -1,6 +1,6 @@
 [project]
 name = "market-sentinel-ai"
-version = "1.0.0"
+version = "1.1.0"
 description = "Predictive market analysis and alerting system with a quantitative core and GPT-6 Astra as contextual reasoning layer."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -16,7 +16,9 @@ classifiers = [
   "Programming Language :: Python :: 3.11",
   "Topic :: Office/Business :: Financial :: Investment",
 ]
-dependencies = []
+dependencies = [
+  "tzdata>=2025.2; platform_system == 'Windows'",
+]
 
 [project.optional-dependencies]
 api = [
@@ -37,6 +39,7 @@ dev = [
   "ruff>=0.8.0",
   "mypy>=1.13.0",
   "pytest>=8.3.0",
+  "wheel>=0.45.0",
 ]
 
 [project.scripts]

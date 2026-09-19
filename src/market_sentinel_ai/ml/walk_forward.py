@@ -77,8 +77,8 @@ class WalkForwardEvaluator:
         fold_metrics: list[ClassificationMetrics] = []
         for fold in self.splitter.split(examples):
             model = self.model_factory()
-            fit = getattr(model, "fit")
-            predict = getattr(model, "predict")
+            fit = model.fit
+            predict = model.predict
             fit(examples[fold.train_start : fold.train_end])
 
             actual: list[int] = []

@@ -47,6 +47,8 @@ class OpenAISettings:
 class MarketDataSettings:
     provider: str
     api_key: str
+    base_url: str
+    poll_seconds: int
 
     @property
     def has_credentials(self) -> bool:
@@ -96,6 +98,8 @@ class Settings:
             market_data=MarketDataSettings(
                 provider=_env_str("MARKET_DATA_PROVIDER", "demo"),
                 api_key=_env_str("MARKET_DATA_API_KEY", ""),
+                base_url=_env_str("MARKET_DATA_BASE_URL", ""),
+                poll_seconds=_env_int("MARKET_DATA_POLL_SECONDS", 60),
             ),
             alerts=AlertSettings(
                 dry_run=_env_bool("ALERTS_DRY_RUN", True),
@@ -110,4 +114,3 @@ class Settings:
                 default_slippage_bps=_env_float("RISK_DEFAULT_SLIPPAGE_BPS", 2.0),
             ),
         )
-

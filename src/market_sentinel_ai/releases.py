@@ -34,7 +34,9 @@ RELEASE_PLAN: tuple[Release, ...] = (
         code="R3",
         version="0.4.0",
         title="Supervised ML And Walk-Forward Evaluation",
-        objective="Train XGBoost/LightGBM models and evaluate out-of-sample using walk-forward folds.",
+        objective=(
+            "Train XGBoost/LightGBM models and evaluate out-of-sample using walk-forward folds."
+        ),
     ),
     Release(
         code="R4",
@@ -46,20 +48,74 @@ RELEASE_PLAN: tuple[Release, ...] = (
         code="R5",
         version="0.6.0",
         title="Order Flow, Ensemble And Multi-Timeframe Modeling",
-        objective="Add order-flow inputs, ensemble logic, multi-timeframe features and regime detection.",
+        objective=(
+            "Add order-flow inputs, ensemble logic, multi-timeframe features and regime detection."
+        ),
     ),
     Release(
         code="R6",
         version="0.7.0",
         title="GPT-6 Astra Context Layer",
-        objective="Integrate Astra through gated structured reasoning, news context, caching and cost limits.",
+        objective=(
+            "Integrate Astra through gated structured reasoning, news context, "
+            "caching and cost limits."
+        ),
     ),
     Release(
         code="R7",
         version="1.0.0",
         title="Paper Trading, Drift, Observability And v1 Hardening",
-        objective="Add paper trading, model drift monitoring, observability and v1 production hardening.",
+        objective=(
+            "Add paper trading, model drift monitoring, observability and v1 production hardening."
+        ),
     ),
 )
 
-CURRENT_RELEASE = RELEASE_PLAN[7]
+COMPLETION_PLAN: tuple[Release, ...] = (
+    Release(
+        code="C1",
+        version="1.1.0",
+        title="Real Market Data Foundation",
+        objective="Add replaceable real-data adapters, ingestion QA and provenance.",
+    ),
+    Release(
+        code="C2",
+        version="1.2.0",
+        title="Quantitative Research Pipeline",
+        objective="Complete boosting models, artifacts, purged walk-forward tests and backtests.",
+    ),
+    Release(
+        code="C3",
+        version="1.3.0",
+        title="Operational Signals Application",
+        objective=(
+            "Ship the local API, dashboard, scheduler, persistent signals and alert channels."
+        ),
+    ),
+    Release(
+        code="C4",
+        version="1.4.0",
+        title="Order Flow And Ensemble",
+        objective="Add real order-book adapters, aligned multi-timeframe features and ensembles.",
+    ),
+    Release(
+        code="C5",
+        version="1.5.0",
+        title="Astra And News Context",
+        objective="Complete news ingestion and audited, budgeted GPT-6 Astra reasoning.",
+    ),
+    Release(
+        code="C6",
+        version="1.6.0",
+        title="Persistent Paper Operations",
+        objective="Persist paper positions, drift state, health metrics and operational recovery.",
+    ),
+    Release(
+        code="C7",
+        version="2.0.0",
+        title="Final Alerting And Paper Trading Release",
+        objective="Integrate, harden, package and document the complete non-executing application.",
+    ),
+)
+
+CURRENT_RELEASE = COMPLETION_PLAN[0]

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Protocol, Sequence
+from collections.abc import Sequence
+from typing import Protocol
 
 from market_sentinel_ai.domain.prediction import Prediction
 from market_sentinel_ai.ports.features import FeatureRow

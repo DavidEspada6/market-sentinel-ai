@@ -8,6 +8,10 @@ from market_sentinel_ai.domain.market import Candle, Timeframe
 
 
 class MarketDataProvider(Protocol):
+    @property
+    def provider_name(self) -> str:
+        """Stable provider identifier used for provenance and operations."""
+
     def historical_candles(
         self,
         symbol: str,
@@ -19,4 +23,3 @@ class MarketDataProvider(Protocol):
 
     def stream_candles(self, symbol: str, timeframe: Timeframe) -> Iterable[Candle]:
         """Yield live or live-like candles. R1 will add concrete adapters."""
-

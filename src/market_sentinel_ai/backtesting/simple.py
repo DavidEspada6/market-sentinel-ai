@@ -67,9 +67,13 @@ def _report_from_returns(returns_bps: Sequence[float]) -> BacktestReport:
         trades=len(returns_bps),
         win_rate=len(wins) / len(returns_bps),
         expectancy_bps=expectancy,
-        profit_factor=math.inf if total_loss == 0 and total_profit > 0 else total_profit / total_loss
-        if total_loss
-        else 0.0,
+        profit_factor=(
+            math.inf
+            if total_loss == 0 and total_profit > 0
+            else total_profit / total_loss
+            if total_loss
+            else 0.0
+        ),
         sharpe=(expectancy / std) * math.sqrt(len(returns_bps)) if std else None,
         sortino=(expectancy / downside_std) * math.sqrt(len(returns_bps))
         if downside_std

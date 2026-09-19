@@ -57,7 +57,8 @@ class LogisticDirectionalModel:
             for example in examples:
                 values = self._normalize(example.features)
                 probability = _sigmoid(
-                    self.bias + sum(self.weights[name] * values[name] for name in self.feature_names)
+                    self.bias
+                    + sum(self.weights[name] * values[name] for name in self.feature_names)
                 )
                 error = probability - example.label
                 bias_gradient += error

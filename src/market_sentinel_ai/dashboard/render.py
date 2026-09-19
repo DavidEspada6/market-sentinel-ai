@@ -83,7 +83,12 @@ def render_dashboard(model: DashboardViewModel) -> str:
     .direction-SHORT {{ color: var(--red); font-weight: 700; }}
     .direction-NO_TRADE {{ color: var(--muted); font-weight: 700; }}
     .bars {{ display: grid; gap: 10px; }}
-    .bar-row {{ display: grid; grid-template-columns: 110px 1fr 54px; gap: 10px; align-items: center; }}
+    .bar-row {{
+      display: grid;
+      grid-template-columns: 110px 1fr 54px;
+      gap: 10px;
+      align-items: center;
+    }}
     .track {{ height: 12px; background: #edf1f3; border-radius: 999px; overflow: hidden; }}
     .fill {{ height: 100%; background: var(--teal); }}
     .muted {{ color: var(--muted); }}
@@ -174,4 +179,3 @@ def _format_float(value: float) -> str:
     if value == float("inf"):
         return "inf"
     return f"{value:.2f}"
-

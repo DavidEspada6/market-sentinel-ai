@@ -6,7 +6,11 @@ from datetime import UTC, datetime, timedelta
 from market_sentinel_ai.adapters.market_data import DemoMarketDataProvider, DemoOrderBookProvider
 from market_sentinel_ai.domain.market import Timeframe
 from market_sentinel_ai.domain.prediction import Direction, Prediction
-from market_sentinel_ai.features import OHLCVFeatureEngine, OrderFlowFeatureEngine, aggregate_candles
+from market_sentinel_ai.features import (
+    OHLCVFeatureEngine,
+    OrderFlowFeatureEngine,
+    aggregate_candles,
+)
 from market_sentinel_ai.models import WeightedEnsembleModel, WeightedModel
 from market_sentinel_ai.ports.features import FeatureRow
 from market_sentinel_ai.regime import Regime, VolatilityRegimeDetector

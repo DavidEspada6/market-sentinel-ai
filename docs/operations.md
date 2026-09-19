@@ -1,10 +1,15 @@
 # Operations
 
-R7 completes v1.0.0 for alerting and paper trading.
+The original v1.0.0 is a prototype baseline. The completion track is active; v1.1.0 adds real
+market-data ingestion while preserving alert-only and paper-trading boundaries.
 
 ## Supported Mode
 
 - Demo/local market data.
+- Yahoo Finance historical/intraday data without credentials.
+- Stooq daily historical data without credentials, subject to its browser-verification policy.
+- Alpha Vantage daily and intraday data with an API key.
+- Persistent ingestion history and quality reports.
 - Historical backtesting.
 - Walk-forward evaluation.
 - Dry-run alerts.
@@ -22,10 +27,9 @@ R7 completes v1.0.0 for alerting and paper trading.
 
 ## Production Checklist
 
-- Use a real market data adapter behind the existing interfaces.
+- Select a real market data adapter and verify its ingestion quality history.
 - Keep secrets in environment variables only.
 - Review backtests out of sample.
 - Review paper trading logs before any broker work.
 - Monitor drift before trusting stale models.
 - Keep Astra budget limits low until signal quality is proven.
-

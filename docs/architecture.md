@@ -39,7 +39,9 @@ Market Sentinel AI is split into ports and adapters so every expensive, unreliab
 - alert channels,
 - repositories.
 
-Adapters will be added release by release.
+Concrete adapters currently cover deterministic demo data, Yahoo Finance and Stooq OHLCV, and
+Alpha Vantage daily/intraday OHLCV. Provider selection is isolated behind a factory and
+environment settings.
 
 ### Reasoning Layer
 
@@ -52,13 +54,18 @@ The Astra layer is intentionally downstream of quantitative signals. It receives
 
 The target output is structured JSON containing a short thesis, invalidation conditions, risk notes and relevant context. Astra must not override hard risk limits.
 
-### Storage
+### Ingestion And Storage
 
-R1 will introduce SQLite storage by default. The storage interface will allow later replacement with Postgres, DuckDB or managed infrastructure.
+SQLite stores normalized candles and immutable ingestion-run records. Every batch is checked for
+empty input, duplicate timestamps and ordering before storage. Quality reports also expose
+intraday gaps and staleness. The storage boundary allows later replacement with Postgres,
+DuckDB or managed infrastructure.
 
 ### Dashboard
 
-R4 will introduce a web dashboard focused on operational scanning: watchlist, current signals, model state, risk exposure, backtest summary and alert history.
+The current generated dashboard is a static snapshot. C3 turns it into a local operational web
+application focused on watchlists, current signals, model state, risk exposure, backtest summaries
+and alert history.
 
 ## Data Flow
 
@@ -90,4 +97,3 @@ Risk-aware signal generation
 - Model selection must be performed inside walk-forward folds.
 - Scaling, imputation and feature selection must be fit only on training windows.
 - Reported metrics must distinguish in-sample, validation and out-of-sample periods.
-
