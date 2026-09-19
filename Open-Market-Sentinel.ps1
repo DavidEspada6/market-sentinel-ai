@@ -6,6 +6,25 @@ try {
         Copy-Item -LiteralPath ".env.example" -Destination ".env"
     }
 
+    if (Test-Path -LiteralPath ".env") {
+        foreach ($line in Get-Content -LiteralPath ".env") {
+            $trimmed = $line.Trim()
+            if ($trimmed -eq "" -or $trimmed.StartsWith("#") -or -not $trimmed.Contains("=")) {
+                continue
+            }
+            $parts = $trimmed.Split("=", 2)
+            $name = $parts[0].Trim()
+            $value = $parts[1].Trim()
+            if (($value.StartsWith('"') -and $value.EndsWith('"')) -or
+                ($value.StartsWith("'") -and $value.EndsWith("'"))) {
+                $value = $value.Substring(1, $value.Length - 2)
+            }
+            if (-not [Environment]::GetEnvironmentVariable($name, "Process")) {
+                [Environment]::SetEnvironmentVariable($name, $value, "Process")
+            }
+        }
+    }
+
     $python = Join-Path $PSScriptRoot ".venv\Scripts\python.exe"
     if (-not (Test-Path -LiteralPath $python)) {
         $systemPython = (Get-Command python -ErrorAction Stop).Source

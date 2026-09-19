@@ -16,9 +16,10 @@ python -m pip install -e ".[dev,ml,api]"
 3. El navegador se abrira en [http://127.0.0.1:8765](http://127.0.0.1:8765).
 4. Para detener la aplicacion, cierra la ventana de PowerShell del servidor.
 
-La primera ejecucion crea `.env` desde `.env.example`. El modo predeterminado usa datos demo
-deterministas. Para consultar datos de mercado actuales sin una clave, edita `.env` y usa
-`MARKET_DATA_PROVIDER=yahoo`; la busqueda de instrumentos usa Yahoo por defecto.
+La primera ejecucion crea `.env` desde `.env.example` y el lanzador carga sus variables al iniciar.
+El modo predeterminado usa datos demo deterministas. Para consultar datos de mercado actuales sin
+una clave, edita `.env` y usa `MARKET_DATA_PROVIDER=yahoo`; la busqueda de instrumentos usa Yahoo
+por defecto. Las variables definidas externamente tienen prioridad sobre `.env`.
 
 ## Analizar un producto
 

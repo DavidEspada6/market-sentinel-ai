@@ -15,6 +15,8 @@ class CliSmokeTests(unittest.TestCase):
         batch = (root / "Open-Market-Sentinel.bat").read_text(encoding="utf-8")
 
         self.assertIn("Faltan dependencias de la UI", powershell)
+        self.assertIn('Get-Content -LiteralPath ".env"', powershell)
+        self.assertIn("SetEnvironmentVariable", powershell)
         self.assertIn("127.0.0.1:$port", powershell)
         self.assertIn("8765", powershell)
         self.assertIn("pause", batch.lower())
@@ -29,7 +31,7 @@ class CliSmokeTests(unittest.TestCase):
 
         payload = json.loads(result.stdout)
         self.assertEqual(payload["current_release"], "O7")
-        self.assertEqual(payload["current_version"], "2.7.2")
+        self.assertEqual(payload["current_version"], "2.7.3")
 
     def test_security_check_command_passes(self) -> None:
         result = subprocess.run(

@@ -178,7 +178,7 @@ FOLLOW_ON_PLAN: tuple[Release, ...] = (
     ),
     Release(
         code="O7",
-        version="2.7.2",
+        version="2.7.3",
         title="Complete UI Control Center",
         objective=(
             "Expose scanning, periodic operations, paper risk, trade history, health, drift and "

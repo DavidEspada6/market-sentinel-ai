@@ -4,6 +4,14 @@ All notable changes to Market Sentinel AI will be documented in this file.
 
 The project follows semantic versioning once v1.0.0 is reached. Pre-1.0 releases map to the staged roadmap.
 
+## [2.7.3] - 2026-09-19
+
+### Fixed
+
+- The Windows launcher now loads non-secret settings from the local `.env` file.
+- External process environment variables keep priority over `.env` values.
+- The local environment is ready to use Yahoo Finance instead of synthetic demo data.
+
 ## [2.7.2] - 2026-09-19
 
 ### Changed

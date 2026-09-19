@@ -29,7 +29,7 @@ class ReleasePlanTests(unittest.TestCase):
         self.assertEqual(FOLLOW_ON_PLAN[0].code, "O1")
         self.assertEqual(FOLLOW_ON_PLAN[-1].version, "3.0.0")
         self.assertEqual(CURRENT_RELEASE.code, "O7")
-        self.assertEqual(CURRENT_RELEASE.version, "2.7.2")
+        self.assertEqual(CURRENT_RELEASE.version, "2.7.3")
         self.assertEqual(version("market-sentinel-ai"), CURRENT_RELEASE.version)
 
 
