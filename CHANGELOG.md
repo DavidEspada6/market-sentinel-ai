@@ -4,6 +4,20 @@ All notable changes to Market Sentinel AI will be documented in this file.
 
 The project follows semantic versioning once v1.0.0 is reached. Pre-1.0 releases map to the staged roadmap.
 
+## [1.5.0] - 2026-09-19
+
+### Added
+
+- Added an RSS/Atom news adapter and compact symbol-specific news context builder.
+- Added persistent Astra usage accounting for requests, cache hits, token estimates and daily cost.
+- Added input/output token gates, daily cost gates and structured response validation.
+- Added an audited \`/api/v1/astra-usage\` endpoint and a \`news-demo\` command.
+- Added C5 tests for RSS parsing, cache reuse and budget accounting.
+
+### Changed
+
+- Updated the completion track status to C5.
+
 ## [1.4.0] - 2026-09-19
 
 ### Added

@@ -14,11 +14,17 @@ class AstraReasoningProvider:
     def __init__(self, settings: OpenAISettings, cache: ReasoningCache) -> None:
         self.settings = settings
         self.cache = cache
+        self.last_cache_hit = False
+
+    def has_cached(self, signal: Signal, context: dict[str, object]) -> bool:
+        return self.cache.get(self.cache.key_for(signal, context)) is not None
 
     def explain_signal(self, signal: Signal, context: dict[str, object]) -> ReasoningResult:
+        self.last_cache_hit = False
         cache_key = self.cache.key_for(signal, context)
         cached = self.cache.get(cache_key)
         if cached is not None:
+            self.last_cache_hit = True
             return cached
 
         if not self.settings.enabled:
@@ -71,16 +77,14 @@ class AstraReasoningProvider:
                     "strict": True,
                 }
             },
+            max_output_tokens=self.settings.max_output_tokens_per_request,
         )
         payload = json.loads(response.output_text)
-        return ReasoningResult(
+        return _validated_result(
             signal_id=self.cache.signal_id(signal),
             generated_at=datetime.now(tz=UTC),
-            thesis=payload["thesis"],
-            invalidation=payload["invalidation"],
-            risk_notes=tuple(payload["risk_notes"]),
-            context_sources=tuple(payload["context_sources"]),
-            raw_cost_tokens_estimate=None,
+            payload=payload,
+            raw_cost_tokens_estimate=_response_token_estimate(response),
         )
 
     def _fallback(self, signal: Signal, context: dict[str, object], reason: str) -> ReasoningResult:
@@ -98,3 +102,44 @@ class AstraReasoningProvider:
             raw_cost_tokens_estimate=0,
         )
 
+
+def _validated_result(
+    *,
+    signal_id: str,
+    generated_at: datetime,
+    payload: object,
+    raw_cost_tokens_estimate: int | None,
+) -> ReasoningResult:
+    if not isinstance(payload, dict):
+        raise ValueError("Astra response must be a JSON object")
+    required = ("thesis", "invalidation", "risk_notes", "context_sources")
+    if any(key not in payload for key in required):
+        raise ValueError("Astra response is missing required structured fields")
+    if not isinstance(payload["thesis"], str) or not isinstance(payload["invalidation"], str):
+        raise ValueError("Astra thesis and invalidation must be strings")
+    if not isinstance(payload["risk_notes"], list) or not all(
+        isinstance(item, str) for item in payload["risk_notes"]
+    ):
+        raise ValueError("Astra risk_notes must be a list of strings")
+    if not isinstance(payload["context_sources"], list) or not all(
+        isinstance(item, str) for item in payload["context_sources"]
+    ):
+        raise ValueError("Astra context_sources must be a list of strings")
+    return ReasoningResult(
+        signal_id=signal_id,
+        generated_at=generated_at,
+        thesis=payload["thesis"],
+        invalidation=payload["invalidation"],
+        risk_notes=tuple(payload["risk_notes"]),
+        context_sources=tuple(payload["context_sources"]),
+        raw_cost_tokens_estimate=raw_cost_tokens_estimate,
+    )
+
+
+def _response_token_estimate(response: object) -> int | None:
+    usage = getattr(response, "usage", None)
+    if usage is None:
+        return None
+    input_tokens = getattr(usage, "input_tokens", 0) or 0
+    output_tokens = getattr(usage, "output_tokens", 0) or 0
+    return int(input_tokens) + int(output_tokens)

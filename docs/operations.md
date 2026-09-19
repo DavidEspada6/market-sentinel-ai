@@ -1,8 +1,8 @@
 # Operations
 
-The original v1.0.0 is a prototype baseline. The completion track is active; v1.4.0 adds public
-order-book depth, causal multitimeframe features and regime-aware ensembles while preserving
-alert-only and paper-trading boundaries.
+The original v1.0.0 is a prototype baseline. The completion track is active; v1.5.0 adds RSS/Atom
+news context and audited, budgeted Astra reasoning while preserving alert-only and paper-trading
+boundaries.
 
 ## Supported Mode
 
@@ -27,6 +27,8 @@ alert-only and paper-trading boundaries.
 - Public Binance depth adapter with configurable endpoint and depth.
 - Causal multitimeframe feature alignment.
 - Regime-aware ensemble predictions with regime metadata.
+- RSS/Atom news context behind a replaceable provider.
+- Persistent Astra usage records and hard request, token and daily-cost budgets.
 
 ## Not Supported In v1
 

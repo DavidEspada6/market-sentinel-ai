@@ -17,7 +17,8 @@ The default binding is local-only. The service does not place real orders.
 - \`GET /api/v1/signals\` lists persisted signals with optional \`symbol\`, \`timeframe\` and
   \`limit\`.
 - \`GET /api/v1/alerts\` lists persisted alert deliveries.
-- \`GET /api/v1/runs\` lists scheduler runs.
+- GET /api/v1/runs lists scheduler runs.
+- GET /api/v1/astra-usage lists today's request, cache, token and estimated-cost counters.
 - \`POST /api/v1/scan\` ingests the configured market data, produces a risk-gated signal and
   persists the result. The JSON body accepts \`symbol\`, \`timeframe\` and positive \`days\`.
 - \`GET /\` serves the operational dashboard.

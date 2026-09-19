@@ -10,6 +10,7 @@ from market_sentinel_ai.config import Settings
 from market_sentinel_ai.dashboard import render_operational_dashboard
 from market_sentinel_ai.domain.market import Timeframe
 from market_sentinel_ai.operations import MarketScanService
+from market_sentinel_ai.reasoning import AstraUsageLedger
 from market_sentinel_ai.releases import CURRENT_RELEASE
 from market_sentinel_ai.storage import SQLiteCandleRepository
 
@@ -75,6 +76,20 @@ def create_app(
     @app.get("/api/v1/runs")
     def runs(limit: int = Query(default=20, ge=1, le=200)) -> list[dict[str, object]]:
         return [run.to_dict() for run in repository.list_scheduler_runs(limit)]
+
+    @app.get("/api/v1/astra-usage")
+    def astra_usage() -> dict[str, object]:
+        snapshot = AstraUsageLedger(active_settings.openai.usage_path).snapshot()
+        return {
+            "day": snapshot.day.isoformat(),
+            "requests": snapshot.requests,
+            "cache_hits": snapshot.cache_hits,
+            "input_tokens_estimate": snapshot.input_tokens_estimate,
+            "output_tokens_estimate": snapshot.output_tokens_estimate,
+            "estimated_cost_usd": snapshot.estimated_cost_usd,
+            "max_requests_per_day": active_settings.openai.max_context_requests_per_day,
+            "max_daily_cost_usd": active_settings.openai.max_daily_cost_usd,
+        }
 
     @app.post("/api/v1/scan")
     def scan(request: ScanRequest) -> dict[str, object]:

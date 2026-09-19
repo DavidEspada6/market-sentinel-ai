@@ -15,6 +15,7 @@ from market_sentinel_ai.adapters.market_data import (
 from market_sentinel_ai.alerts import DryRunAlertChannel
 from market_sentinel_ai.backtesting import SimpleBacktestEngine
 from market_sentinel_ai.config import Settings
+from market_sentinel_ai.context import NewsContextBuilder, NewsItem, StaticNewsProvider
 from market_sentinel_ai.dashboard import DashboardViewModel, render_dashboard
 from market_sentinel_ai.domain.market import Timeframe
 from market_sentinel_ai.domain.risk import RiskLimits
@@ -40,6 +41,7 @@ from market_sentinel_ai.paper import PaperTradingLedger
 from market_sentinel_ai.reasoning import (
     AstraCostPolicy,
     AstraReasoningProvider,
+    AstraUsageLedger,
     ReasoningCache,
     ReasoningGateway,
 )
@@ -129,6 +131,12 @@ def main() -> None:
     astra.add_argument("--timeframe", choices=[item.value for item in Timeframe], default="5m")
     astra.add_argument("--days", type=int, default=10)
 
+    news = subparsers.add_parser("news-demo")
+    news.add_argument("--provider", choices=["demo", "rss"], default="demo")
+    news.add_argument("--symbol", default="SPY")
+    news.add_argument("--limit", type=int, default=5)
+    news.add_argument("--feed-url", action="append", default=[])
+
     paper = subparsers.add_parser("paper-demo")
     paper.add_argument("--symbol", default="SPY")
     paper.add_argument("--timeframe", choices=[item.value for item in Timeframe], default="5m")
@@ -216,6 +224,9 @@ def main() -> None:
         return
     if command == "astra-context-demo":
         _astra_context_demo(settings, args.symbol, Timeframe(args.timeframe), args.days)
+        return
+    if command == "news-demo":
+        _news_demo(args.provider, args.symbol, args.limit, tuple(args.feed_url))
         return
     if command == "paper-demo":
         _paper_demo(settings, args.symbol, Timeframe(args.timeframe), args.days)
@@ -672,17 +683,34 @@ def _order_book_demo(
 
 def _astra_context_demo(settings: Settings, symbol: str, timeframe: Timeframe, days: int) -> None:
     signal = _demo_signal(settings, symbol, timeframe, days)
+    news_provider = StaticNewsProvider(
+        (
+            NewsItem(
+                title=f"{symbol.upper()} demo context",
+                source="demo-news",
+                published_at=datetime.now(tz=UTC),
+                summary="Deterministic context item for local Astra gating tests.",
+            ),
+        )
+    )
     gateway = ReasoningGateway(
-        provider=AstraReasoningProvider(settings.openai, ReasoningCache()),
+        provider=AstraReasoningProvider(
+            settings.openai,
+            ReasoningCache("logs/astra-cache.json"),
+        ),
         policy=AstraCostPolicy(
             min_confidence=settings.openai.min_signal_confidence,
             max_requests_per_day=settings.openai.max_context_requests_per_day,
+            max_input_tokens_per_request=settings.openai.max_input_tokens_per_request,
+            max_output_tokens_per_request=settings.openai.max_output_tokens_per_request,
+            max_daily_cost_usd=settings.openai.max_daily_cost_usd,
+            input_cost_per_million=settings.openai.input_cost_per_million,
+            output_cost_per_million=settings.openai.output_cost_per_million,
         ),
+        usage_ledger=AstraUsageLedger(settings.openai.usage_path),
     )
-    context = {
-        "sources": ["demo-market-data", "demo-order-flow"],
-        "note": "R6 demo context; live news adapters are intentionally behind interfaces.",
-    }
+    context = NewsContextBuilder(news_provider).for_symbol(symbol)
+    context["sources"] = ["demo-market-data", "demo-order-flow", *context["sources"]]
     reasoning = gateway.maybe_explain(signal, context)
     print(
         json.dumps(
@@ -696,6 +724,33 @@ def _astra_context_demo(settings: Settings, symbol: str, timeframe: Timeframe, d
                 "risk_notes": list(reasoning.risk_notes) if reasoning else [],
                 "context_sources": list(reasoning.context_sources) if reasoning else [],
             },
+            indent=2,
+            sort_keys=True,
+        )
+    )
+
+
+def _news_demo(provider_name: str, symbol: str, limit: int, feed_urls: tuple[str, ...]) -> None:
+    if provider_name == "demo":
+        provider = StaticNewsProvider(
+            (
+                NewsItem(
+                    title=f"{symbol.upper()} demo news",
+                    source="demo-news",
+                    published_at=datetime.now(tz=UTC),
+                    summary="Deterministic news context for local development.",
+                ),
+            )
+        )
+    else:
+        if not feed_urls:
+            raise ValueError("--feed-url is required when --provider rss")
+        from market_sentinel_ai.context import RssNewsProvider
+
+        provider = RssNewsProvider(feed_urls)
+    print(
+        json.dumps(
+            NewsContextBuilder(provider).for_symbol(symbol, limit),
             indent=2,
             sort_keys=True,
         )

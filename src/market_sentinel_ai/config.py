@@ -37,6 +37,12 @@ class OpenAISettings:
     reasoning_effort: str
     max_context_requests_per_day: int
     min_signal_confidence: float
+    max_input_tokens_per_request: int
+    max_output_tokens_per_request: int
+    max_daily_cost_usd: float
+    input_cost_per_million: float
+    output_cost_per_million: float
+    usage_path: str
 
     @property
     def enabled(self) -> bool:
@@ -104,6 +110,14 @@ class Settings:
                 reasoning_effort=_env_str("OPENAI_REASONING_EFFORT", "low"),
                 max_context_requests_per_day=_env_int("ASTRA_MAX_CONTEXT_REQUESTS_PER_DAY", 25),
                 min_signal_confidence=_env_float("ASTRA_MIN_SIGNAL_CONFIDENCE", 0.72),
+                max_input_tokens_per_request=_env_int("ASTRA_MAX_INPUT_TOKENS_PER_REQUEST", 4000),
+                max_output_tokens_per_request=_env_int(
+                    "ASTRA_MAX_OUTPUT_TOKENS_PER_REQUEST", 800
+                ),
+                max_daily_cost_usd=_env_float("ASTRA_MAX_DAILY_COST_USD", 2.0),
+                input_cost_per_million=_env_float("ASTRA_INPUT_COST_PER_MILLION", 10.0),
+                output_cost_per_million=_env_float("ASTRA_OUTPUT_COST_PER_MILLION", 50.0),
+                usage_path=_env_str("ASTRA_USAGE_PATH", "logs/astra-usage.jsonl"),
             ),
             market_data=MarketDataSettings(
                 provider=_env_str("MARKET_DATA_PROVIDER", "demo"),
