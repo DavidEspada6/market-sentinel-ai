@@ -40,6 +40,14 @@ externamente tienen prioridad sobre `.env`.
   su rango aproximado.
 - El panel de paper trading muestra PnL estimado/realizado/total, VaR, CVaR, Sharpe, Sortino,
   drawdown, profit factor, win rate, expectancy, exposicion y operaciones simuladas.
+- El panel **Modo simulación** mantiene una cuenta virtual independiente. Permite fijar el capital
+  inicial, elegir el activo seleccionado, usar un margen, escoger apalancamiento de 1x a 10x y
+  abrir posiciones `LONG` o `SHORT`. Las posiciones abiertas muestran entrada, precio actual,
+  PnL no realizado y liquidación aproximada; el botón `Cerrar` fija el PnL realizado.
+- La cuenta de simulación se marca con precios del proveedor aproximadamente cada 15 segundos
+  mientras la UI permanece abierta. Si el proveedor no entrega un precio nuevo, conserva el último
+  precio marcado y lo indica en el estado. `Reiniciar simulación` borra el historial después de
+  cerrar las posiciones abiertas.
 - El panel de salud muestra estado del servicio, modelo cuantitativo, drift, uso de Astra y la
   ultima ejecucion. El modelo adaptativo se vuelve a entrenar al detectar una vela nueva durante
   un escaneo; con poco historial se indica `Baseline de respaldo`.
@@ -47,7 +55,8 @@ externamente tienen prioridad sobre `.env`.
   e inferior es un rango aproximado calculado con ATR y momentum, no una segunda predicción
   contraria. No es una prediccion garantizada, asesoramiento financiero ni una orden automatica.
 
-El panel sigue siendo alert-only y paper trading. No envia ordenes reales.
+El panel sigue siendo alert-only, paper trading y simulación local. No envia ordenes reales ni
+conecta con un broker.
 
 El puerto predeterminado es `8765`. Puedes cambiarlo antes de abrir el lanzador con
 `$env:MARKET_SENTINEL_PORT=9000` si tambien necesitas reservar ese puerto.

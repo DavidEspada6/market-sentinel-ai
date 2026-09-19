@@ -35,6 +35,17 @@ The default binding is local-only. The service does not place real orders.
 - GET /api/v1/paper/trades lists persisted simulated trades.
 - GET /api/v1/paper/metrics returns estimated, realized and unrealized PnL, historical VaR/CVaR,
   volatility, Sharpe, Sortino, drawdown, profit factor, win rate, expectancy and exposure.
+- GET /api/v1/simulation/account returns the local simulation balance, equity, available/used
+  margin, exposure, open positions and mark-to-market PnL. It refreshes positions from the
+  configured market-data provider when prices are available.
+- POST /api/v1/simulation/reset starts a new simulation account with `starting_equity`; it is
+  refused while positions are open.
+- POST /api/v1/simulation/positions opens a LONG or SHORT simulated position. Its JSON body accepts
+  `symbol`, `direction`, `margin`, `leverage` from 1x to 10x and an optional current `price`.
+- POST /api/v1/simulation/positions/{position_id}/close closes a local position at an optional
+  supplied price or the latest provider price.
+- GET /api/v1/simulation/trades lists closed simulation trades; GET /api/v1/simulation/metrics
+  returns realized/unrealized/total PnL, VaR/CVaR, exposure, drawdown and performance metrics.
 - GET /api/v1/drift lists persisted feature-drift reports.
 - GET /api/v1/health/details runs and persists a database/application health check.
 - GET /api/v1/health/history lists previous health checks.

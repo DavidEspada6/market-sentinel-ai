@@ -7,6 +7,37 @@ from market_sentinel_ai.domain.prediction import Direction
 
 
 @dataclass(frozen=True)
+class PaperPosition:
+    position_id: str
+    account_id: str
+    symbol: str
+    direction: Direction
+    quantity: float
+    entry_price: float
+    mark_price: float
+    leverage: float
+    margin: float
+    entry_cost: float
+    opened_at: datetime
+    updated_at: datetime
+
+    @property
+    def notional(self) -> float:
+        return self.quantity * self.entry_price
+
+    @property
+    def mark_notional(self) -> float:
+        return self.quantity * self.mark_price
+
+    @property
+    def gross_unrealized_pnl(self) -> float:
+        difference = self.mark_price - self.entry_price
+        if self.direction is Direction.SHORT:
+            difference *= -1
+        return difference * self.quantity
+
+
+@dataclass(frozen=True)
 class PaperTrade:
     symbol: str
     direction: Direction

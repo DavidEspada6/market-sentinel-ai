@@ -196,6 +196,15 @@ FOLLOW_ON_PLAN: tuple[Release, ...] = (
     ),
     Release(
         code="O9",
+        version="2.9.0",
+        title="Leveraged Simulation Workspace",
+        objective=(
+            "Add a persistent mark-to-market simulator with configurable capital, LONG/SHORT "
+            "positions, bounded leverage, margin, costs and risk metrics without broker access."
+        ),
+    ),
+    Release(
+        code="O10",
         version="3.0.0",
         title="Optional Broker Integration Review",
         objective=(
@@ -205,4 +214,4 @@ FOLLOW_ON_PLAN: tuple[Release, ...] = (
     ),
 )
 
-CURRENT_RELEASE = FOLLOW_ON_PLAN[7]
+CURRENT_RELEASE = FOLLOW_ON_PLAN[8]

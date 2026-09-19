@@ -6,9 +6,8 @@ published tags remain immutable. This completion track closed that scope through
 releases and ended at v2.0.0. The follow-on operational track is documented in
 [operational-roadmap.md](operational-roadmap.md).
 
-The operational track now includes O8, which connects the local supervised model to the live
-provider scan and exposes its out-of-sample training diagnostics. Broker execution remains a
-separate O9 review and is still disabled.
+The operational track now includes O9, which adds a persistent leveraged simulation account while
+keeping broker execution separate and disabled. Broker execution remains a separate O10 review.
 
 | Release | Version | Deliverable |
 | --- | --- | --- |

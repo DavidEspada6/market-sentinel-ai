@@ -9,7 +9,7 @@ Market Sentinel AI is split into ports and adapters so every expensive, unreliab
 - Every prediction must be evaluated out of sample before it can produce alerts.
 - Backtests must include fees, spread and slippage.
 - Data, feature generation and labels must be time-aware to avoid leakage.
-- The application starts with alerting and paper trading, not live execution.
+- The application starts with alerting, paper trading and local simulation, not live execution.
 
 ## Modules
 
@@ -26,6 +26,7 @@ Market Sentinel AI is split into ports and adapters so every expensive, unreliab
 - signals and confidence,
 - risk limits,
 - alerts and reasoning results.
+- paper accounts, open simulation positions and closed paper trades.
 
 ### Ports
 

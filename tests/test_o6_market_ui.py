@@ -139,6 +139,11 @@ class O6MarketUITests(unittest.TestCase):
             self.assertIn("mousemove", html)
             self.assertIn('data-chart-mode="candles"', html)
             self.assertIn("Velas OHLC", html)
+            self.assertIn("Modo simulación", html)
+            self.assertIn('id="sim-open"', html)
+            self.assertIn('id="sim-long"', html)
+            self.assertIn('id="sim-short"', html)
+            self.assertIn("/api/v1/simulation/positions", html)
 
     def test_live_provider_does_not_fall_back_to_unlabelled_cache(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

@@ -14,6 +14,7 @@ from market_sentinel_ai.domain.market import Candle, Timeframe
 from market_sentinel_ai.domain.operations import AlertRecord, SchedulerRunRecord, SignalRecord
 from market_sentinel_ai.domain.paper import (
     PaperAccountSnapshot,
+    PaperPosition,
     PaperTrade,
     PaperTradeRecord,
 )
@@ -124,6 +125,24 @@ CREATE TABLE IF NOT EXISTS paper_trades (
 
 CREATE INDEX IF NOT EXISTS idx_paper_trades_account_closed_at
 ON paper_trades(account_id, closed_at DESC);
+
+CREATE TABLE IF NOT EXISTS paper_positions (
+    position_id TEXT PRIMARY KEY,
+    account_id TEXT NOT NULL,
+    symbol TEXT NOT NULL,
+    direction TEXT NOT NULL,
+    quantity REAL NOT NULL,
+    entry_price REAL NOT NULL,
+    mark_price REAL NOT NULL,
+    leverage REAL NOT NULL,
+    margin REAL NOT NULL,
+    entry_cost REAL NOT NULL,
+    opened_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_paper_positions_account_updated_at
+ON paper_positions(account_id, updated_at DESC);
 
 CREATE TABLE IF NOT EXISTS drift_reports (
     report_id TEXT PRIMARY KEY,
@@ -658,6 +677,92 @@ class SQLiteCandleRepository:
             )
             for row in rows
         ]
+
+    def save_paper_position(self, position: PaperPosition) -> None:
+        with closing(self._connect()) as connection, connection:
+            connection.execute(
+                """
+                INSERT INTO paper_positions (
+                    position_id, account_id, symbol, direction, quantity, entry_price,
+                    mark_price, leverage, margin, entry_cost, opened_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(position_id) DO UPDATE SET
+                    mark_price = excluded.mark_price,
+                    updated_at = excluded.updated_at
+                """,
+                (
+                    position.position_id,
+                    position.account_id,
+                    position.symbol,
+                    position.direction.value,
+                    position.quantity,
+                    position.entry_price,
+                    position.mark_price,
+                    position.leverage,
+                    position.margin,
+                    position.entry_cost,
+                    position.opened_at.isoformat(),
+                    position.updated_at.isoformat(),
+                ),
+            )
+
+    def list_paper_positions(self, account_id: str) -> list[PaperPosition]:
+        with closing(self._connect()) as connection:
+            rows = connection.execute(
+                """
+                SELECT position_id, account_id, symbol, direction, quantity, entry_price,
+                       mark_price, leverage, margin, entry_cost, opened_at, updated_at
+                FROM paper_positions
+                WHERE account_id = ?
+                ORDER BY opened_at ASC
+                """,
+                (account_id,),
+            ).fetchall()
+        return [
+            PaperPosition(
+                position_id=row["position_id"],
+                account_id=row["account_id"],
+                symbol=row["symbol"],
+                direction=Direction(row["direction"]),
+                quantity=row["quantity"],
+                entry_price=row["entry_price"],
+                mark_price=row["mark_price"],
+                leverage=row["leverage"],
+                margin=row["margin"],
+                entry_cost=row["entry_cost"],
+                opened_at=datetime.fromisoformat(row["opened_at"]),
+                updated_at=datetime.fromisoformat(row["updated_at"]),
+            )
+            for row in rows
+        ]
+
+    def delete_paper_position(self, account_id: str, position_id: str) -> None:
+        with closing(self._connect()) as connection, connection:
+            connection.execute(
+                "DELETE FROM paper_positions WHERE account_id = ? AND position_id = ?",
+                (account_id, position_id),
+            )
+
+    def reset_paper_account(self, account_id: str, snapshot: PaperAccountSnapshot) -> None:
+        if snapshot.real_execution_enabled:
+            raise ValueError("real execution is disabled for paper accounts")
+        with closing(self._connect()) as connection, connection:
+            connection.execute("DELETE FROM paper_positions WHERE account_id = ?", (account_id,))
+            connection.execute("DELETE FROM paper_trades WHERE account_id = ?", (account_id,))
+            connection.execute("DELETE FROM paper_accounts WHERE account_id = ?", (account_id,))
+            connection.execute(
+                """
+                INSERT INTO paper_accounts (
+                    account_id, starting_equity, equity, updated_at, real_execution_enabled
+                ) VALUES (?, ?, ?, ?, 0)
+                """,
+                (
+                    snapshot.account_id,
+                    snapshot.starting_equity,
+                    snapshot.equity,
+                    snapshot.updated_at.isoformat(),
+                ),
+            )
 
     def record_drift_report(
         self,

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 
 from fastapi import FastAPI, HTTPException, Query
@@ -25,8 +26,11 @@ from market_sentinel_ai.domain.instruments import (
     search_instruments,
 )
 from market_sentinel_ai.domain.market import Timeframe
+from market_sentinel_ai.domain.paper import PaperPosition
+from market_sentinel_ai.domain.prediction import Direction
 from market_sentinel_ai.monitoring import HealthService
 from market_sentinel_ai.operations import MarketScanService, MarketScheduler
+from market_sentinel_ai.paper import SimulationError, SimulationLedger
 from market_sentinel_ai.reasoning import AstraUsageLedger
 from market_sentinel_ai.releases import CURRENT_RELEASE
 from market_sentinel_ai.signals import SignalEngine, build_trade_plan
@@ -53,6 +57,22 @@ class WatchlistScanRequest(BaseModel):
     days: int = Field(default=5, gt=0, le=3650)
 
 
+class SimulationResetRequest(BaseModel):
+    starting_equity: float = Field(gt=0, le=1_000_000_000)
+
+
+class SimulationPositionRequest(BaseModel):
+    symbol: str = Field(min_length=1, max_length=24)
+    direction: str
+    margin: float = Field(gt=0, le=1_000_000_000)
+    leverage: float = Field(default=1.0, ge=1.0, le=10.0)
+    price: float | None = Field(default=None, gt=0)
+
+
+class SimulationCloseRequest(BaseModel):
+    price: float | None = Field(default=None, gt=0)
+
+
 def create_app(
     settings: Settings | None = None,
     service: MarketScanService | None = None,
@@ -63,10 +83,122 @@ def create_app(
     app = FastAPI(
         title="Market Sentinel AI",
         version=CURRENT_RELEASE.version,
-        description="Alert-only quantitative market analysis API.",
+        description="Quantitative market analysis API with local paper simulation only.",
     )
     app.state.scan_service = active_service
     app.state.repository = repository
+
+    def simulation_ledger() -> SimulationLedger:
+        return SimulationLedger(
+            store=repository,
+            account_id="simulation",
+            fee_bps=active_settings.risk.default_fee_bps,
+            slippage_bps=active_settings.risk.default_slippage_bps,
+            spread_bps=active_settings.risk.default_spread_bps,
+        )
+
+    def latest_simulation_prices(symbols: set[str]) -> dict[str, float]:
+        prices: dict[str, float] = {}
+        end = datetime.now(tz=UTC).replace(second=0, microsecond=0)
+        start = end - timedelta(days=2)
+        for symbol in symbols:
+            try:
+                selected = next(
+                    (item for item in repository.list_watchlist() if item.symbol == symbol),
+                    None,
+                )
+                selected = selected or find_instrument(symbol) or custom_instrument(symbol)
+                market_symbol = selected.market_symbol
+                fetched = list(
+                    active_service.provider.historical_candles(
+                        market_symbol,
+                        Timeframe.FIVE_MINUTES,
+                        start,
+                        end,
+                    )
+                )
+                candles = sorted(fetched, key=lambda candle: candle.opened_at)
+                if candles:
+                    repository.upsert_many(candles)
+                    prices[symbol] = candles[-1].close
+                    continue
+                cached = repository.list_candles(
+                    market_symbol,
+                    Timeframe.FIVE_MINUTES,
+                    start,
+                    end,
+                )
+                if cached:
+                    prices[symbol] = cached[-1].close
+            except (MarketDataProviderError, OSError, ValueError):
+                continue
+        return prices
+
+    def simulation_price(symbol: str, supplied_price: float | None = None) -> float:
+        if supplied_price is not None:
+            return supplied_price
+        price = latest_simulation_prices({symbol}).get(symbol)
+        if price is None:
+            raise HTTPException(
+                status_code=503,
+                detail=(
+                    f"fresh price unavailable for {symbol}; provide a current chart price "
+                    "or verify the market-data provider"
+                ),
+            )
+        return price
+
+    def refresh_simulation(ledger: SimulationLedger) -> dict[str, float]:
+        prices = latest_simulation_prices({position.symbol for position in ledger.positions})
+        ledger.refresh_prices(prices)
+        return prices
+
+    def simulation_position_payload(
+        ledger: SimulationLedger,
+        position: PaperPosition,
+    ) -> dict[str, object]:
+        return {
+            "position_id": position.position_id,
+            "symbol": position.symbol,
+            "direction": position.direction.value,
+            "quantity": position.quantity,
+            "entry_price": position.entry_price,
+            "mark_price": position.mark_price,
+            "leverage": position.leverage,
+            "margin": position.margin,
+            "notional": position.mark_notional,
+            "unrealized_pnl": ledger.position_unrealized_pnl(position),
+            "liquidation_price": ledger.liquidation_price(position),
+            "opened_at": position.opened_at.isoformat(),
+            "updated_at": position.updated_at.isoformat(),
+        }
+
+    def simulation_account_payload(
+        ledger: SimulationLedger,
+        prices: dict[str, float],
+    ) -> dict[str, object]:
+        return {
+            "account_id": ledger.account_id,
+            "mode": "simulation",
+            "real_execution_enabled": False,
+            "real_orders_enabled": False,
+            "starting_equity": ledger.starting_equity,
+            "cash_balance": ledger.cash,
+            "equity": ledger.equity,
+            "available_margin": ledger.available_margin,
+            "used_margin": ledger.used_margin,
+            "unrealized_pnl": ledger.unrealized_pnl,
+            "realized_pnl": ledger.realized_pnl,
+            "total_pnl": ledger.equity - ledger.starting_equity,
+            "return_pct": (ledger.equity / ledger.starting_equity - 1) * 100,
+            "exposure": ledger.exposure,
+            "max_leverage": ledger.MAX_LEVERAGE,
+            "prices_refreshed": sorted(prices),
+            "updated_at": datetime.now(tz=UTC).isoformat(),
+            "positions": [
+                simulation_position_payload(ledger, position) for position in ledger.positions
+            ],
+        }
 
     @app.get("/health")
     def health() -> dict[str, object]:
@@ -88,6 +220,8 @@ def create_app(
             "provider": active_settings.market_data.provider,
             "alert_dry_run": active_settings.alerts.dry_run,
             "real_orders_enabled": False,
+            "simulation_enabled": True,
+            "simulation_max_leverage": SimulationLedger.MAX_LEVERAGE,
         }
 
     @app.get("/api/v1/signals")
@@ -412,6 +546,128 @@ def create_app(
             max_position_pct=active_settings.risk.max_position_pct,
         )
         return {"account_id": account_id, **metrics.to_dict()}
+
+    @app.get("/api/v1/simulation/account")
+    def simulation_account() -> dict[str, object]:
+        ledger = simulation_ledger()
+        prices = refresh_simulation(ledger)
+        return simulation_account_payload(ledger, prices)
+
+    @app.post("/api/v1/simulation/reset")
+    def reset_simulation(request: SimulationResetRequest) -> dict[str, object]:
+        ledger = simulation_ledger()
+        try:
+            ledger.reset(request.starting_equity)
+        except SimulationError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        return simulation_account_payload(ledger, {})
+
+    @app.post("/api/v1/simulation/positions")
+    def open_simulation_position(request: SimulationPositionRequest) -> dict[str, object]:
+        ledger = simulation_ledger()
+        try:
+            direction = Direction(request.direction.upper())
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail="direction must be LONG or SHORT") from exc
+        normalized_symbol = request.symbol.strip().upper()
+        price = simulation_price(normalized_symbol, request.price)
+        try:
+            position = ledger.open_position(
+                symbol=normalized_symbol,
+                direction=direction,
+                margin=request.margin,
+                leverage=request.leverage,
+                entry_price=price,
+            )
+        except SimulationError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        return {
+            "position": simulation_position_payload(ledger, position),
+            "account": simulation_account_payload(ledger, {normalized_symbol: price}),
+        }
+
+    @app.post("/api/v1/simulation/positions/{position_id}/close")
+    def close_simulation_position(
+        position_id: str,
+        request: SimulationCloseRequest,
+    ) -> dict[str, object]:
+        ledger = simulation_ledger()
+        position = next(
+            (item for item in ledger.positions if item.position_id == position_id),
+            None,
+        )
+        if position is None:
+            raise HTTPException(status_code=404, detail="simulation position not found")
+        price = simulation_price(position.symbol, request.price)
+        try:
+            trade = ledger.close_position(position_id, price)
+        except SimulationError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        return {
+            "trade": {
+                "symbol": trade.symbol,
+                "direction": trade.direction.value,
+                "quantity": trade.quantity,
+                "entry_price": trade.entry_price,
+                "exit_price": trade.exit_price,
+                "pnl": trade.pnl,
+                "opened_at": trade.opened_at.isoformat(),
+                "closed_at": trade.closed_at.isoformat(),
+            },
+            "account": simulation_account_payload(ledger, {position.symbol: price}),
+        }
+
+    @app.get("/api/v1/simulation/trades")
+    def simulation_trades(
+        limit: int = Query(default=100, ge=1, le=1000),
+    ) -> list[dict[str, object]]:
+        ledger = simulation_ledger()
+        return [
+            {
+                "trade_id": record.trade_id,
+                "symbol": record.trade.symbol,
+                "direction": record.trade.direction.value,
+                "quantity": record.trade.quantity,
+                "entry_price": record.trade.entry_price,
+                "exit_price": record.trade.exit_price,
+                "pnl": record.trade.pnl,
+                "opened_at": record.trade.opened_at.isoformat(),
+                "closed_at": record.trade.closed_at.isoformat(),
+            }
+            for record in repository.list_paper_trades(ledger.account_id, limit)
+        ]
+
+    @app.get("/api/v1/simulation/metrics")
+    def simulation_metrics(
+        limit: int = Query(default=500, ge=1, le=5000),
+    ) -> dict[str, object]:
+        ledger = simulation_ledger()
+        refresh_simulation(ledger)
+        metrics = calculate_risk_metrics(
+            ledger.trades,
+            [],
+            starting_equity=ledger.starting_equity,
+            max_position_pct=1.0,
+        )
+        metrics = replace(
+            metrics,
+            unrealized_pnl=ledger.unrealized_pnl,
+            total_pnl=ledger.equity - ledger.starting_equity,
+            exposure=ledger.exposure,
+            starting_equity=ledger.starting_equity,
+            sample_size=min(len(ledger.trades), limit),
+        )
+        return {
+            "account_id": ledger.account_id,
+            **metrics.to_dict(),
+            "cash_balance": ledger.cash,
+            "equity": ledger.equity,
+            "available_margin": ledger.available_margin,
+            "used_margin": ledger.used_margin,
+            "open_positions": len(ledger.positions),
+            "max_leverage": ledger.MAX_LEVERAGE,
+            "real_orders_enabled": False,
+        }
 
     @app.get("/api/v1/drift")
     def drift_reports(limit: int = Query(default=50, ge=1, le=500)) -> list[dict[str, object]]:

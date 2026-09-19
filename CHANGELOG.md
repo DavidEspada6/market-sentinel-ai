@@ -4,6 +4,21 @@ All notable changes to Market Sentinel AI will be documented in this file.
 
 The project follows semantic versioning once v1.0.0 is reached. Pre-1.0 releases map to the staged roadmap.
 
+## [2.9.0] - 2026-09-19
+
+### Added
+
+- Added a persistent local simulation account with configurable starting capital.
+- Added interactive LONG/SHORT positions with margin, bounded 1x-10x leverage and simulated fees,
+  spread and slippage.
+- Added mark-to-market equity, available margin, exposure, unrealized/realized/total PnL and
+  approximate liquidation levels.
+- Added simulation reset, close-position controls, auto-refresh and trade history to the UI.
+
+### Safety
+
+- Simulation remains local paper trading only; the API and UI keep real order execution disabled.
+
 ## [2.8.2] - 2026-09-19
 
 ### Added

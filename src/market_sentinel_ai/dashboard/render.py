@@ -282,6 +282,32 @@ def render_operational_dashboard(
     .diagnostic-item small {{ display: block; color: var(--muted); margin-top: 4px; }}
     .trade-table {{ max-height: 250px; overflow: auto; }}
     .trade-table table {{ min-width: 560px; }}
+    .simulation-panel {{ border-top: 4px solid var(--blue); }}
+    .simulation-heading {{ display: flex; justify-content: space-between; align-items: flex-start;
+      gap: 16px; margin-bottom: 12px; }}
+    .simulation-heading p {{ margin: 4px 0 0; color: var(--muted); font-size: 13px; max-width: 720px; }}
+    .simulation-badge {{ background: #e7efff; color: #1d4ed8; border-radius: 4px;
+      padding: 6px 9px; font-size: 11px; font-weight: 800; white-space: nowrap; }}
+    .simulation-account-grid {{ display: grid; grid-template-columns: repeat(6, minmax(0, 1fr));
+      gap: 10px; margin: 14px 0; }}
+    .simulation-account-item {{ border-left: 3px solid var(--blue); padding: 6px 0 6px 10px; }}
+    .simulation-account-item.positive {{ border-color: var(--green); }}
+    .simulation-account-item.negative {{ border-color: var(--red); }}
+    .simulation-account-item span {{ display: block; color: var(--muted); font-size: 11px;
+      text-transform: uppercase; }}
+    .simulation-account-item strong {{ display: block; margin-top: 4px; font-size: 16px; }}
+    .simulation-controls {{ display: flex; flex-wrap: wrap; align-items: end; gap: 10px;
+      padding: 12px; background: #f6f9ff; border: 1px solid #dbe6ff; }}
+    .simulation-controls .control-field input {{ min-width: 130px; }}
+    .simulation-direction {{ display: inline-flex; gap: 4px; }}
+    .simulation-direction button {{ min-width: 96px; background: #eef1f3; color: var(--ink); }}
+    .simulation-direction button.active-long {{ background: var(--green); color: #fff; }}
+    .simulation-direction button.active-short {{ background: var(--red); color: #fff; }}
+    .simulation-note {{ color: var(--muted); font-size: 12px; margin: 10px 0 0; }}
+    .simulation-positions {{ margin-top: 16px; overflow: auto; }}
+    .simulation-positions table {{ min-width: 820px; }}
+    .simulation-pnl-positive {{ color: var(--green); font-weight: 700; }}
+    .simulation-pnl-negative {{ color: var(--red); font-weight: 700; }}
     .static-report-note {{ background: #fff8e6; border-left: 3px solid var(--amber); padding: 10px 12px;
       color: #72520f; font-size: 13px; margin-bottom: 14px; }}
     table {{ width: 100%; border-collapse: collapse; background: var(--panel); }}
@@ -362,7 +388,7 @@ def render_operational_dashboard(
       .panel {{ overflow-x: auto; }} table {{ min-width: 680px; }}
       .market-heading {{ flex-direction: column; }} .market-badges {{ justify-content: flex-start; }}
       .chart-summary, .trade-levels {{ grid-template-columns: repeat(2, minmax(0, 1fr)); }}
-      .window-buttons {{ min-width: 620px; }} .system-grid, .risk-grid {{ grid-template-columns: repeat(2, minmax(0, 1fr)); }}
+      .window-buttons {{ min-width: 620px; }} .system-grid, .risk-grid, .simulation-account-grid {{ grid-template-columns: repeat(2, minmax(0, 1fr)); }}
       .data-layout {{ grid-template-columns: 1fr; }} .diagnostic-grid {{ grid-template-columns: 1fr; }} }}
   </style>
 </head>
@@ -511,6 +537,53 @@ def render_operational_dashboard(
         </div></div>
       </div>
     </div></section>
+    <section><div class="panel simulation-panel">
+      <div class="simulation-heading">
+        <div><h2>Modo simulación</h2>
+          <p>Opera con saldo virtual usando datos de mercado. El margen es el importe que reservas;
+            el apalancamiento amplía la exposición y los costes simulados se descuentan del PnL.</p>
+        </div>
+        <span class="simulation-badge">SIMULACIÓN · SIN ÓRDENES REALES</span>
+      </div>
+      <div class="simulation-account-grid">
+        <div class="simulation-account-item"><span>Capital inicial</span><strong id="sim-starting-equity">-</strong></div>
+        <div class="simulation-account-item"><span>Saldo disponible</span><strong id="sim-cash-balance">-</strong></div>
+        <div class="simulation-account-item"><span>Equity</span><strong id="sim-equity">-</strong></div>
+        <div class="simulation-account-item"><span>Margen disponible</span><strong id="sim-available-margin">-</strong></div>
+        <div class="simulation-account-item"><span>PnL no realizado</span><strong id="sim-unrealized-pnl">-</strong></div>
+        <div class="simulation-account-item"><span>PnL total</span><strong id="sim-total-pnl">-</strong></div>
+      </div>
+      <div class="simulation-controls">
+        <label class="control-field">Activo seleccionado
+          <input id="sim-symbol" type="text" value="" readonly></label>
+        <label class="control-field">Margen a usar
+          <input id="sim-margin" type="number" min="1" step="0.01" value="1000"></label>
+        <label class="control-field">Apalancamiento
+          <select id="sim-leverage"><option value="1">1x</option><option value="2">2x</option>
+            <option value="3">3x</option><option value="5" selected>5x</option><option value="10">10x</option></select>
+        </label>
+        <div class="control-field"><span>Dirección</span>
+          <div class="simulation-direction"><button type="button" id="sim-long" class="active-long">LONG</button>
+            <button type="button" id="sim-short">SHORT</button></div>
+        </div>
+        <button type="button" id="sim-open">Abrir posición</button>
+        <label class="control-field">Nuevo capital inicial
+          <input id="sim-reset-equity" type="number" min="1" step="0.01" value="100000"></label>
+        <button type="button" class="secondary" id="sim-reset">Reiniciar simulación</button>
+      </div>
+      <div class="simulation-note" id="sim-status" aria-live="polite">
+        Selecciona un activo y abre una posición simulada. La cuenta se actualiza periódicamente.
+      </div>
+      <div class="simulation-positions"><h3>Posiciones abiertas</h3>
+        <table><thead><tr><th>Activo</th><th>Dirección</th><th>Margen</th><th>Apalancamiento</th>
+          <th>Entrada</th><th>Precio actual</th><th>PnL</th><th>Liquidación aprox.</th><th></th></tr></thead>
+          <tbody id="sim-positions-rows"><tr><td colspan="9" class="muted">No hay posiciones abiertas.</td></tr></tbody></table>
+      </div>
+      <div class="simulation-positions"><h3>Historial de simulación</h3>
+        <table><thead><tr><th>Activo</th><th>Dirección</th><th>Entrada</th><th>Salida</th><th>PnL</th><th>Cierre</th></tr></thead>
+          <tbody id="sim-trades-rows"><tr><td colspan="6" class="muted">Aún no hay operaciones cerradas.</td></tr></tbody></table>
+      </div>
+    </div></section>
     <section><div class="panel">
       <h2>Salud, drift y contexto</h2>
       <div class="diagnostic-grid">
@@ -564,6 +637,12 @@ def render_operational_dashboard(
     const scanInterval = document.getElementById('scan-interval');
     const periodicButton = document.getElementById('scan-periodic');
     const realOrdersBadge = document.getElementById('real-orders-badge');
+    const simulationStatus = document.getElementById('sim-status');
+    const simulationSymbol = document.getElementById('sim-symbol');
+    const simulationLong = document.getElementById('sim-long');
+    const simulationShort = document.getElementById('sim-short');
+    let simulationDirection = 'LONG';
+    let simulationTimer = null;
 
     function setOperationStatus(message) {{ operationStatus.textContent = message; }}
 
@@ -677,6 +756,99 @@ def render_operational_dashboard(
 
     function formatConfidence(value) {{
       return typeof value === 'number' ? `${{(value * 100).toFixed(1)}}%` : '-';
+    }}
+
+    function formatSimulationPnl(value) {{
+      if (typeof value !== 'number') return '-';
+      return `${{value >= 0 ? '+' : ''}}${{formatMoneyValue(value)}}`;
+    }}
+
+    function setSimulationStatus(message) {{ simulationStatus.textContent = message; }}
+
+    function appendSimulationCell(row, value, className = '') {{
+      const cell = document.createElement('td');
+      cell.textContent = safeText(value);
+      if (className) cell.className = className;
+      row.appendChild(cell);
+    }}
+
+    function renderSimulationAccount(account, trades) {{
+      document.getElementById('sim-starting-equity').textContent = formatMoneyValue(account.starting_equity);
+      document.getElementById('sim-cash-balance').textContent = formatMoneyValue(account.cash_balance);
+      document.getElementById('sim-equity').textContent = formatMoneyValue(account.equity);
+      document.getElementById('sim-available-margin').textContent = formatMoneyValue(account.available_margin);
+      document.getElementById('sim-unrealized-pnl').textContent = formatSimulationPnl(account.unrealized_pnl);
+      document.getElementById('sim-total-pnl').textContent = formatSimulationPnl(account.total_pnl);
+      const positionsRows = document.getElementById('sim-positions-rows');
+      positionsRows.replaceChildren();
+      if (!account.positions || !account.positions.length) {{
+        positionsRows.innerHTML = '<tr><td colspan="9" class="muted">No hay posiciones abiertas.</td></tr>';
+      }} else {{
+        account.positions.forEach((position) => {{
+          const row = document.createElement('tr');
+          appendSimulationCell(row, position.symbol);
+          appendSimulationCell(row, position.direction, position.direction === 'LONG' ? 'long' : 'short');
+          appendSimulationCell(row, formatMoneyValue(position.margin));
+          appendSimulationCell(row, `${{position.leverage}}x`);
+          appendSimulationCell(row, formatPrice(position.entry_price));
+          appendSimulationCell(row, formatPrice(position.mark_price));
+          appendSimulationCell(row, formatSimulationPnl(position.unrealized_pnl),
+            position.unrealized_pnl >= 0 ? 'simulation-pnl-positive' : 'simulation-pnl-negative');
+          appendSimulationCell(row, formatPrice(position.liquidation_price));
+          const actionCell = document.createElement('td');
+          const closeButton = document.createElement('button');
+          closeButton.type = 'button'; closeButton.className = 'secondary'; closeButton.textContent = 'Cerrar';
+          closeButton.addEventListener('click', () => closeSimulationPosition(position));
+          actionCell.appendChild(closeButton); row.appendChild(actionCell);
+          positionsRows.appendChild(row);
+        }});
+      }}
+      const tradesRows = document.getElementById('sim-trades-rows');
+      tradesRows.replaceChildren();
+      if (!trades || !trades.length) {{
+        tradesRows.innerHTML = '<tr><td colspan="6" class="muted">Aún no hay operaciones cerradas.</td></tr>';
+      }} else {{
+        trades.slice().reverse().forEach((trade) => {{
+          const row = document.createElement('tr');
+          appendSimulationCell(row, trade.symbol);
+          appendSimulationCell(row, trade.direction, trade.direction === 'LONG' ? 'long' : 'short');
+          appendSimulationCell(row, formatPrice(trade.entry_price));
+          appendSimulationCell(row, formatPrice(trade.exit_price));
+          appendSimulationCell(row, formatSimulationPnl(trade.pnl),
+            trade.pnl >= 0 ? 'simulation-pnl-positive' : 'simulation-pnl-negative');
+          appendSimulationCell(row, safeText(trade.closed_at));
+          tradesRows.appendChild(row);
+        }});
+      }}
+    }}
+
+    async function loadSimulation() {{
+      const [account, trades] = await Promise.all([
+        fetchJson('/api/v1/simulation/account'), fetchJson('/api/v1/simulation/trades?limit=50')
+      ]);
+      if (!account) {{
+        setSimulationStatus('No se pudo cargar la cuenta de simulación.');
+        return;
+      }}
+      renderSimulationAccount(account, trades || []);
+      const refreshed = account.prices_refreshed && account.prices_refreshed.length;
+      setSimulationStatus(refreshed ?
+        `Mercado actualizado para: ${{account.prices_refreshed.join(', ')}} · apalancamiento máximo ${{account.max_leverage}}x.` :
+        'Sin precios nuevos del proveedor; se conserva el último precio marcado.');
+    }}
+
+    async function closeSimulationPosition(position) {{
+      const currentPrice = lastChartPayload && lastChartPayload.symbol === position.symbol ?
+        lastChartPayload.latest.close : undefined;
+      const response = await fetch(`/api/v1/simulation/positions/${{encodeURIComponent(position.position_id)}}/close`, {{
+        method: 'POST', headers: {{'Content-Type': 'application/json'}},
+        body: JSON.stringify(currentPrice ? {{price: currentPrice}} : {{}})
+      }});
+      const payload = await response.json().catch(() => ({{}}));
+      if (!response.ok) {{ setSimulationStatus(payload.detail || 'No se pudo cerrar la posición.'); return; }}
+      setSimulationStatus(`Posición cerrada. PnL: ${{formatSimulationPnl(payload.trade.pnl)}}`);
+      await loadSimulation();
+      await loadOperationalData();
     }}
 
     function setSummary(payload) {{
@@ -913,6 +1085,7 @@ def render_operational_dashboard(
     async function loadMarket(symbol, windowValue) {{
       if (!symbol) return;
       selectedSymbol = symbol; selectedWindow = windowValue; markSelectedRow(symbol);
+      simulationSymbol.value = symbol;
       document.querySelectorAll('.window-button').forEach((button) => {{
         button.classList.toggle('active', button.dataset.window === windowValue);
       }});
@@ -1063,7 +1236,45 @@ def render_operational_dashboard(
       setOperationStatus('Actualizando métricas y estado...'); await loadOperationalData();
       setOperationStatus('Datos actualizados.');
     }});
+    function selectSimulationDirection(direction) {{
+      simulationDirection = direction;
+      simulationLong.className = direction === 'LONG' ? 'active-long' : '';
+      simulationShort.className = direction === 'SHORT' ? 'active-short' : '';
+    }}
+    simulationLong.addEventListener('click', () => selectSimulationDirection('LONG'));
+    simulationShort.addEventListener('click', () => selectSimulationDirection('SHORT'));
+    document.getElementById('sim-open').addEventListener('click', async () => {{
+      const symbol = simulationSymbol.value || selectedSymbol;
+      if (!symbol) {{ setSimulationStatus('Selecciona un activo antes de abrir una posición.'); return; }}
+      const margin = Number(document.getElementById('sim-margin').value);
+      const leverage = Number(document.getElementById('sim-leverage').value);
+      const currentPrice = lastChartPayload && lastChartPayload.symbol === symbol ?
+        lastChartPayload.latest.close : undefined;
+      setSimulationStatus('Abriendo posición simulada...');
+      const response = await fetch('/api/v1/simulation/positions', {{
+        method: 'POST', headers: {{'Content-Type': 'application/json'}},
+        body: JSON.stringify({{symbol, direction: simulationDirection, margin, leverage, price: currentPrice}})
+      }});
+      const payload = await response.json().catch(() => ({{}}));
+      if (!response.ok) {{ setSimulationStatus(payload.detail || 'No se pudo abrir la posición.'); return; }}
+      setSimulationStatus(`Posición ${{simulationDirection}} abierta en ${{formatPrice(payload.position.entry_price)}}.`);
+      await loadSimulation();
+    }});
+    document.getElementById('sim-reset').addEventListener('click', async () => {{
+      const startingEquity = Number(document.getElementById('sim-reset-equity').value);
+      if (!startingEquity || !window.confirm('Esto borrará el historial de simulación. ¿Continuar?')) return;
+      const response = await fetch('/api/v1/simulation/reset', {{
+        method: 'POST', headers: {{'Content-Type': 'application/json'}},
+        body: JSON.stringify({{starting_equity: startingEquity}})
+      }});
+      const payload = await response.json().catch(() => ({{}}));
+      if (!response.ok) {{ setSimulationStatus(payload.detail || 'No se pudo reiniciar la simulación.'); return; }}
+      setSimulationStatus(`Cuenta reiniciada con ${{formatMoneyValue(startingEquity)}}.`);
+      await loadSimulation();
+    }});
     loadOperationalData().catch(() => setOperationStatus('No se pudo cargar el estado operativo.'));
+    loadSimulation().catch(() => setSimulationStatus('No se pudo cargar la simulación.'));
+    simulationTimer = window.setInterval(() => loadSimulation().catch(() => {{}}), 15000);
   </script>
 </body>
 </html>
