@@ -52,6 +52,28 @@ class WalkForwardTests(unittest.TestCase):
         self.assertGreaterEqual(report.average_coverage, 0.0)
         self.assertLessEqual(report.average_accuracy, 1.0)
 
+    def test_purged_split_leaves_gap_before_each_test_window(self) -> None:
+        provider = DemoMarketDataProvider()
+        start = datetime(2026, 9, 18, tzinfo=UTC)
+        candles = list(
+            provider.historical_candles(
+                "SPY",
+                Timeframe.FIVE_MINUTES,
+                start,
+                start + timedelta(minutes=5 * 100),
+            )
+        )
+        examples = build_directional_examples(candles, OHLCVFeatureEngine(rolling_window=5))
+
+        folds = WalkForwardSplit(
+            train_size=30,
+            test_size=10,
+            purge_size=2,
+        ).split(examples)
+
+        self.assertGreaterEqual(len(folds), 3)
+        self.assertTrue(all(fold.test_start - fold.train_end == 2 for fold in folds))
+
 
 if __name__ == "__main__":
     unittest.main()

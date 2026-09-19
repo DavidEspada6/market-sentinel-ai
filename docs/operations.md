@@ -1,7 +1,8 @@
 # Operations
 
-The original v1.0.0 is a prototype baseline. The completion track is active; v1.1.0 adds real
-market-data ingestion while preserving alert-only and paper-trading boundaries.
+The original v1.0.0 is a prototype baseline. The completion track is active; v1.2.0 adds real
+boosting models, model artifacts and purged walk-forward evaluation while preserving alert-only
+and paper-trading boundaries.
 
 ## Supported Mode
 
@@ -10,6 +11,8 @@ market-data ingestion while preserving alert-only and paper-trading boundaries.
 - Stooq daily historical data without credentials, subject to its browser-verification policy.
 - Alpha Vantage daily and intraday data with an API key.
 - Persistent ingestion history and quality reports.
+- XGBoost and LightGBM training with native, checksum-verified artifacts.
+- Purged walk-forward reports with trading costs included.
 - Historical backtesting.
 - Walk-forward evaluation.
 - Dry-run alerts.

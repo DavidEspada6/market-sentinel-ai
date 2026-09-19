@@ -25,10 +25,12 @@ from market_sentinel_ai.features import (
 from market_sentinel_ai.ingestion import MarketDataIngestionService
 from market_sentinel_ai.ml import WalkForwardEvaluator, WalkForwardSplit, build_directional_examples
 from market_sentinel_ai.models import (
+    LightGBMDirectionalModel,
     LogisticDirectionalModel,
     MomentumBaselineModel,
     WeightedEnsembleModel,
     WeightedModel,
+    XGBoostDirectionalModel,
 )
 from market_sentinel_ai.monitoring import FeatureDriftDetector, JsonlEventLogger
 from market_sentinel_ai.paper import PaperTradingLedger
@@ -87,6 +89,16 @@ def main() -> None:
     walk_forward.add_argument("--days", type=int, default=30)
     walk_forward.add_argument("--train-size", type=int, default=500)
     walk_forward.add_argument("--test-size", type=int, default=100)
+    walk_forward.add_argument(
+        "--model", choices=["logistic", "xgboost", "lightgbm"], default="logistic"
+    )
+
+    boosting = subparsers.add_parser("boosting-demo")
+    boosting.add_argument("--backend", choices=["xgboost", "lightgbm"], default="xgboost")
+    boosting.add_argument("--symbol", default="SPY")
+    boosting.add_argument("--timeframe", choices=[item.value for item in Timeframe], default="5m")
+    boosting.add_argument("--days", type=int, default=5)
+    boosting.add_argument("--output", default="models/demo-boosting")
 
     signals = subparsers.add_parser("signals-demo")
     signals.add_argument("--symbol", default="SPY")
@@ -148,11 +160,22 @@ def main() -> None:
         return
     if command == "walk-forward-demo":
         _walk_forward_demo(
+            settings,
             args.symbol,
             Timeframe(args.timeframe),
             args.days,
             args.train_size,
             args.test_size,
+            args.model,
+        )
+        return
+    if command == "boosting-demo":
+        _boosting_demo(
+            args.backend,
+            args.symbol,
+            Timeframe(args.timeframe),
+            args.days,
+            args.output,
         )
         return
     if command == "signals-demo":
@@ -263,6 +286,7 @@ def _backtest_demo(settings: Settings, symbol: str, timeframe: Timeframe, days: 
         model=MomentumBaselineModel(horizon_minutes=5),
         fee_bps=settings.risk.default_fee_bps,
         slippage_bps=settings.risk.default_slippage_bps,
+        spread_bps=settings.risk.default_spread_bps,
     )
     report = engine.run(candles)
     print(
@@ -280,6 +304,12 @@ def _backtest_demo(settings: Settings, symbol: str, timeframe: Timeframe, days: 
                 "max_drawdown_pct": report.max_drawdown_pct,
                 "fees_bps": settings.risk.default_fee_bps,
                 "slippage_bps": settings.risk.default_slippage_bps,
+                "spread_bps": settings.risk.default_spread_bps,
+                "gross_pnl_bps": report.gross_pnl_bps,
+                "net_pnl_bps": report.net_pnl_bps,
+                "net_pnl": report.net_pnl,
+                "ending_equity": report.ending_equity,
+                "total_return_pct": report.total_return_pct,
             },
             indent=2,
             sort_keys=True,
@@ -288,11 +318,13 @@ def _backtest_demo(settings: Settings, symbol: str, timeframe: Timeframe, days: 
 
 
 def _walk_forward_demo(
+    settings: Settings,
     symbol: str,
     timeframe: Timeframe,
     days: int,
     train_size: int,
     test_size: int,
+    model_backend: str,
 ) -> None:
     end = datetime.now(tz=UTC).replace(second=0, microsecond=0)
     start = end - timedelta(days=days)
@@ -301,8 +333,11 @@ def _walk_forward_demo(
     candles = list(provider.historical_candles(symbol, timeframe, start, end))
     examples = build_directional_examples(candles, feature_engine, horizon_candles=1)
     evaluator = WalkForwardEvaluator(
-        model_factory=lambda: LogisticDirectionalModel(horizon_minutes=5, epochs=100),
-        splitter=WalkForwardSplit(train_size=train_size, test_size=test_size),
+        model_factory=lambda: _make_supervised_model(model_backend),
+        splitter=WalkForwardSplit(train_size=train_size, test_size=test_size, purge_size=1),
+        fee_bps=settings.risk.default_fee_bps,
+        slippage_bps=settings.risk.default_slippage_bps,
+        spread_bps=settings.risk.default_spread_bps,
     )
     report = evaluator.evaluate(examples)
     print(
@@ -313,6 +348,49 @@ def _walk_forward_demo(
                 "average_precision": report.average_precision,
                 "average_recall": report.average_recall,
                 "average_coverage": report.average_coverage,
+                "average_net_pnl_bps": report.average_net_pnl_bps,
+                "average_sharpe": report.average_sharpe,
+            },
+            indent=2,
+            sort_keys=True,
+        )
+    )
+
+
+def _make_supervised_model(backend: str):
+    if backend == "xgboost":
+        return XGBoostDirectionalModel(n_estimators=30, max_depth=3)
+    if backend == "lightgbm":
+        return LightGBMDirectionalModel(n_estimators=30, max_depth=3)
+    return LogisticDirectionalModel(horizon_minutes=5, epochs=100)
+
+
+def _boosting_demo(
+    backend: str,
+    symbol: str,
+    timeframe: Timeframe,
+    days: int,
+    output: str,
+) -> None:
+    end = datetime.now(tz=UTC).replace(second=0, microsecond=0)
+    start = end - timedelta(days=days)
+    candles = list(DemoMarketDataProvider().historical_candles(symbol, timeframe, start, end))
+    feature_engine = OHLCVFeatureEngine(rolling_window=20)
+    examples = build_directional_examples(candles, feature_engine, horizon_candles=1)
+    model = _make_supervised_model(backend)
+    model.fit(examples)
+    manifest = model.save(output)
+    prediction = model.predict(feature_engine.transform(candles)[-1:])
+    print(
+        json.dumps(
+            {
+                "backend": backend,
+                "examples": len(examples),
+                "manifest": str(manifest),
+                "model": model.name,
+                "direction": prediction.direction.value,
+                "probability": prediction.probability,
+                "probability_long": prediction.metadata["probability_long"],
             },
             indent=2,
             sort_keys=True,
@@ -381,6 +459,7 @@ def _dashboard_demo(
         model=MomentumBaselineModel(horizon_minutes=5),
         fee_bps=settings.risk.default_fee_bps,
         slippage_bps=settings.risk.default_slippage_bps,
+        spread_bps=settings.risk.default_spread_bps,
     ).run(candles)
 
     examples = build_directional_examples(candles, feature_engine, horizon_candles=1)
@@ -388,7 +467,10 @@ def _dashboard_demo(
     test_size = min(100, max(10, len(examples) // 10))
     walk_forward_report = WalkForwardEvaluator(
         model_factory=lambda: LogisticDirectionalModel(horizon_minutes=5, epochs=50),
-        splitter=WalkForwardSplit(train_size=train_size, test_size=test_size),
+        splitter=WalkForwardSplit(train_size=train_size, test_size=test_size, purge_size=1),
+        fee_bps=settings.risk.default_fee_bps,
+        slippage_bps=settings.risk.default_slippage_bps,
+        spread_bps=settings.risk.default_spread_bps,
     ).evaluate(examples)
 
     html = render_dashboard(
@@ -422,7 +504,11 @@ def _demo_signal(settings: Settings, symbol: str, timeframe: Timeframe, days: in
     ).predict(features)
     return SignalEngine(
         min_probability=0.52,
-        min_expected_return_bps=settings.risk.default_fee_bps + settings.risk.default_slippage_bps,
+        min_expected_return_bps=(
+            settings.risk.default_fee_bps * 2
+            + settings.risk.default_slippage_bps * 2
+            + settings.risk.default_spread_bps
+        ),
     ).from_prediction(prediction)
 
 
@@ -522,6 +608,7 @@ def _paper_demo(settings: Settings, symbol: str, timeframe: Timeframe, days: int
         max_daily_loss_pct=settings.risk.max_daily_loss_pct,
         fee_bps=settings.risk.default_fee_bps,
         slippage_bps=settings.risk.default_slippage_bps,
+        spread_bps=settings.risk.default_spread_bps,
     )
     trade = ledger.simulate_round_trip(
         signal=signal,

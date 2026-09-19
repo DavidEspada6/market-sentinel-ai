@@ -95,5 +95,13 @@ Risk-aware signal generation
 - Features at time `t` may only use information available at or before `t`.
 - Labels must be shifted forward and never merged back into feature windows.
 - Model selection must be performed inside walk-forward folds.
+- Training examples whose forward label can overlap a test window are removed by `purge_size`.
 - Scaling, imputation and feature selection must be fit only on training windows.
 - Reported metrics must distinguish in-sample, validation and out-of-sample periods.
+
+## Model Artifacts
+
+XGBoost and LightGBM artifacts use each library's native format plus a JSON manifest. The
+manifest records the feature schema, hyperparameters, training timestamp, library version,
+return calibration summary and a SHA-256 checksum. Loading validates the checksum before the
+model can produce a prediction. Python pickle is not used for model persistence.

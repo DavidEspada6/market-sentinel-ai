@@ -4,6 +4,23 @@ All notable changes to Market Sentinel AI will be documented in this file.
 
 The project follows semantic versioning once v1.0.0 is reached. Pre-1.0 releases map to the staged roadmap.
 
+## [1.2.0] - 2026-09-19
+
+### Added
+
+- Added trainable XGBoost and LightGBM directional models.
+- Added native model artifacts with JSON manifests, library versions, feature schemas and SHA-256 checksums.
+- Added causal volatility, ATR, RSI, EMA, momentum, range and calendar features.
+- Added purged, expanding walk-forward evaluation with out-of-sample trading metrics.
+- Added separate fees, spread and slippage accounting with PnL, equity, return, Sharpe, Sortino and drawdown outputs.
+- Added `boosting-demo` and selectable boosting backends for `walk-forward-demo`.
+- Added tests that train, reload and checksum both native model formats.
+
+### Changed
+
+- Updated the completion track status to C2.
+- Updated the CLI backtest and signal cost gates to use round-trip costs.
+
 ## [1.1.0] - 2026-09-19
 
 ### Added

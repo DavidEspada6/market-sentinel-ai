@@ -2,7 +2,7 @@
 
 Market Sentinel AI is a predictive market analysis and alerting application. Its core loop is quantitative, cheap and deterministic: market data ingestion, feature engineering, supervised models, walk-forward backtesting, risk controls and alerting. GPT-6 Astra is reserved for contextual reasoning when a signal is important enough to justify the extra cost.
 
-Market Sentinel AI v1.1.0 is an alerting and paper-trading market analysis application under active completion. It includes deterministic demo data, replaceable Yahoo Finance, Stooq and Alpha Vantage market-data adapters, quality-gated SQLite ingestion, OHLCV/order-flow features, baseline backtesting, supervised walk-forward evaluation, signal generation, dry-run alerts, dashboard generation, regime detection, weighted ensemble, gated GPT-6 Astra contextual reasoning, paper trading, drift checks and operational logs. It does not place live trades.
+Market Sentinel AI v1.2.0 is an alerting and paper-trading market analysis application under active completion. It includes deterministic demo data, replaceable Yahoo Finance, Stooq and Alpha Vantage market-data adapters, quality-gated SQLite ingestion, causal OHLCV/volatility features, trainable XGBoost and LightGBM models, purged walk-forward evaluation, cost-aware backtesting, signal generation, dry-run alerts, dashboard generation, regime detection, weighted ensemble, gated GPT-6 Astra contextual reasoning, paper trading, drift checks and operational logs. It does not place live trades.
 
 ## Safety Position
 
@@ -35,6 +35,7 @@ The honest completion track for the operational application is in [docs/completi
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install -e .[dev]
+python -m pip install -e ".[dev,ml]"  # C2 boosting models
 Copy-Item .env.example .env
 python -m unittest discover -s tests
 python -m market_sentinel_ai
@@ -45,6 +46,8 @@ python -m market_sentinel_ai ingestion-runs --limit 10
 python -m market_sentinel_ai list-candles --symbol SPY --timeframe 5m --days 3
 python -m market_sentinel_ai backtest-demo --symbol SPY --timeframe 5m --days 10
 python -m market_sentinel_ai walk-forward-demo --symbol SPY --timeframe 5m --days 30
+python -m market_sentinel_ai boosting-demo --backend xgboost --symbol SPY --timeframe 5m --days 5
+python -m market_sentinel_ai walk-forward-demo --model lightgbm --symbol SPY --timeframe 5m --days 30
 python -m market_sentinel_ai signals-demo --symbol SPY --timeframe 5m --days 10
 python -m market_sentinel_ai dashboard-demo --symbol SPY --timeframe 5m --days 30 --output reports/dashboard.html
 python -m market_sentinel_ai ensemble-demo --symbol SPY --timeframe 5m --days 20
@@ -79,6 +82,7 @@ Market data providers
 
 Read [docs/architecture.md](docs/architecture.md) for the module boundaries and [docs/risk.md](docs/risk.md) for trading-safety rules.
 Read [docs/market-data.md](docs/market-data.md) for provider setup, limits and ingestion quality.
+Read [docs/models.md](docs/models.md) for training, purging, artifacts and evaluation metrics.
 Read [docs/astra.md](docs/astra.md) for the R6 GPT-6 Astra integration rules.
 Read [docs/operations.md](docs/operations.md) for the v1 operating boundaries.
 

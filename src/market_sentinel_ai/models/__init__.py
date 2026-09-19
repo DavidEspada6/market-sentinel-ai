@@ -1,6 +1,7 @@
 from market_sentinel_ai.models.baseline import MomentumBaselineModel
 from market_sentinel_ai.models.boosting import (
     LightGBMDirectionalModel,
+    ModelArtifactError,
     OptionalDependencyMissingError,
     XGBoostDirectionalModel,
 )
@@ -11,6 +12,7 @@ __all__ = [
     "LightGBMDirectionalModel",
     "LogisticDirectionalModel",
     "MomentumBaselineModel",
+    "ModelArtifactError",
     "OptionalDependencyMissingError",
     "WeightedEnsembleModel",
     "WeightedModel",

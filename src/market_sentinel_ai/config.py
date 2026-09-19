@@ -69,6 +69,7 @@ class RiskSettings:
     max_daily_loss_pct: float
     default_fee_bps: float
     default_slippage_bps: float
+    default_spread_bps: float
 
 
 @dataclass(frozen=True)
@@ -112,5 +113,6 @@ class Settings:
                 max_daily_loss_pct=_env_float("RISK_MAX_DAILY_LOSS_PCT", 0.03),
                 default_fee_bps=_env_float("RISK_DEFAULT_FEE_BPS", 1.0),
                 default_slippage_bps=_env_float("RISK_DEFAULT_SLIPPAGE_BPS", 2.0),
+                default_spread_bps=_env_float("RISK_DEFAULT_SPREAD_BPS", 1.0),
             ),
         )

@@ -16,9 +16,16 @@ class BacktestReport:
     sharpe: float | None
     sortino: float | None
     max_drawdown_pct: float
+    gross_pnl_bps: float = 0.0
+    net_pnl_bps: float = 0.0
+    total_cost_bps: float = 0.0
+    starting_equity: float = 0.0
+    ending_equity: float = 0.0
+    net_pnl: float = 0.0
+    total_return_pct: float = 0.0
+    trade_returns_bps: tuple[float, ...] = ()
 
 
 class BacktestEngine(Protocol):
     def run(self, candles: Sequence[Candle]) -> BacktestReport:
         """Run a leakage-aware backtest over time-ordered candles."""
-

@@ -46,7 +46,9 @@ class PaperTradingLedger:
         gross = (exit_price - entry_price) * quantity
         if signal.prediction.direction is Direction.SHORT:
             gross *= -1
-        costs = notional * ((risk.fee_bps + risk.slippage_bps) * 2 / 10_000)
+        costs = notional * (
+            (risk.fee_bps * 2 + risk.slippage_bps * 2 + risk.spread_bps) / 10_000
+        )
         pnl = gross - costs
         trade = PaperTrade(
             symbol=signal.prediction.symbol,
@@ -65,4 +67,3 @@ class PaperTradingLedger:
     @property
     def total_pnl(self) -> float:
         return self.equity - self.starting_equity
-

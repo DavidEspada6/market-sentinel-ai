@@ -67,6 +67,9 @@ class FeatureAndBacktestTests(unittest.TestCase):
         self.assertEqual(report.win_rate, 1.0)
         self.assertGreater(report.expectancy_bps, 0)
         self.assertEqual(report.max_drawdown_pct, 0.0)
+        self.assertGreater(report.gross_pnl_bps, report.net_pnl_bps)
+        self.assertGreater(report.ending_equity, report.starting_equity)
+        self.assertGreater(report.total_return_pct, 0)
 
 
 if __name__ == "__main__":

@@ -20,9 +20,9 @@ class ReleasePlanTests(unittest.TestCase):
         self.assertEqual(COMPLETION_PLAN[0].version, "1.1.0")
         self.assertEqual(COMPLETION_PLAN[-1].version, "2.0.0")
 
-    def test_current_release_is_c1(self) -> None:
-        self.assertEqual(CURRENT_RELEASE.code, "C1")
-        self.assertEqual(CURRENT_RELEASE.version, "1.1.0")
+    def test_current_release_is_c2(self) -> None:
+        self.assertEqual(CURRENT_RELEASE.code, "C2")
+        self.assertEqual(CURRENT_RELEASE.version, "1.2.0")
         self.assertEqual(version("market-sentinel-ai"), CURRENT_RELEASE.version)
 
 

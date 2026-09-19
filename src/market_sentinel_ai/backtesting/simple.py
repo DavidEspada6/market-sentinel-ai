@@ -20,17 +20,30 @@ class SimpleBacktestEngine:
         model: PredictiveModel,
         fee_bps: float,
         slippage_bps: float,
+        spread_bps: float = 0.0,
+        initial_equity: float = 100_000.0,
+        position_fraction: float = 1.0,
     ) -> None:
+        if min(fee_bps, slippage_bps, spread_bps) < 0:
+            raise ValueError("trading costs cannot be negative")
+        if initial_equity <= 0:
+            raise ValueError("initial_equity must be positive")
+        if not 0 < position_fraction <= 1:
+            raise ValueError("position_fraction must be in (0, 1]")
         self.feature_engine = feature_engine
         self.model = model
         self.fee_bps = fee_bps
         self.slippage_bps = slippage_bps
+        self.spread_bps = spread_bps
+        self.initial_equity = initial_equity
+        self.position_fraction = position_fraction
 
     def run(self, candles: Sequence[Candle]) -> BacktestReport:
         if len(candles) < 3:
-            return _empty_report()
+            return _empty_report(self.initial_equity)
 
         features = self.feature_engine.transform(candles)
+        gross_returns_bps: list[float] = []
         trade_returns_bps: list[float] = []
         for index in range(1, len(candles) - 1):
             prediction = self.model.predict(features[: index + 1])
@@ -44,24 +57,46 @@ class SimpleBacktestEngine:
             if prediction.direction is Direction.SHORT:
                 gross_return_bps *= -1
 
-            round_trip_cost_bps = (self.fee_bps + self.slippage_bps) * 2
+            round_trip_cost_bps = self.fee_bps * 2 + self.slippage_bps * 2 + self.spread_bps
+            gross_returns_bps.append(gross_return_bps)
             trade_returns_bps.append(gross_return_bps - round_trip_cost_bps)
 
-        return _report_from_returns(trade_returns_bps)
+        return build_backtest_report(
+            trade_returns_bps,
+            gross_returns_bps=gross_returns_bps,
+            initial_equity=self.initial_equity,
+            position_fraction=self.position_fraction,
+        )
 
 
-def _report_from_returns(returns_bps: Sequence[float]) -> BacktestReport:
+def build_backtest_report(
+    returns_bps: Sequence[float],
+    *,
+    gross_returns_bps: Sequence[float] | None = None,
+    initial_equity: float = 100_000.0,
+    position_fraction: float = 1.0,
+) -> BacktestReport:
     if not returns_bps:
-        return _empty_report()
+        return _empty_report(initial_equity)
+    if gross_returns_bps is None:
+        gross_returns_bps = returns_bps
+    if len(gross_returns_bps) != len(returns_bps):
+        raise ValueError("gross and net returns must have the same length")
 
     wins = [value for value in returns_bps if value > 0]
     losses = [value for value in returns_bps if value < 0]
     total_profit = sum(wins)
     total_loss = abs(sum(losses))
-    expectancy = mean(returns_bps)
-    std = pstdev(returns_bps) if len(returns_bps) > 1 else 0.0
-    downside = [min(0.0, value) for value in returns_bps]
+    portfolio_returns = [value * position_fraction for value in returns_bps]
+    expectancy = mean(portfolio_returns)
+    std = pstdev(portfolio_returns) if len(portfolio_returns) > 1 else 0.0
+    downside = [min(0.0, value) for value in portfolio_returns]
     downside_std = pstdev(downside) if len(downside) > 1 else 0.0
+    equity = initial_equity
+    for value in portfolio_returns:
+        equity *= 1 + value / 10_000
+    gross_pnl_bps = sum(gross_returns_bps)
+    net_pnl_bps = sum(returns_bps)
 
     return BacktestReport(
         trades=len(returns_bps),
@@ -78,7 +113,15 @@ def _report_from_returns(returns_bps: Sequence[float]) -> BacktestReport:
         sortino=(expectancy / downside_std) * math.sqrt(len(returns_bps))
         if downside_std
         else None,
-        max_drawdown_pct=_max_drawdown_pct(returns_bps),
+        max_drawdown_pct=_max_drawdown_pct(portfolio_returns),
+        gross_pnl_bps=gross_pnl_bps,
+        net_pnl_bps=net_pnl_bps,
+        total_cost_bps=gross_pnl_bps - net_pnl_bps,
+        starting_equity=initial_equity,
+        ending_equity=equity,
+        net_pnl=equity - initial_equity,
+        total_return_pct=((equity / initial_equity) - 1) * 100,
+        trade_returns_bps=tuple(returns_bps),
     )
 
 
@@ -93,7 +136,7 @@ def _max_drawdown_pct(returns_bps: Sequence[float]) -> float:
     return max_drawdown * 100
 
 
-def _empty_report() -> BacktestReport:
+def _empty_report(initial_equity: float = 100_000.0) -> BacktestReport:
     return BacktestReport(
         trades=0,
         win_rate=0.0,
@@ -102,4 +145,6 @@ def _empty_report() -> BacktestReport:
         sharpe=None,
         sortino=None,
         max_drawdown_pct=0.0,
+        starting_equity=initial_equity,
+        ending_equity=initial_equity,
     )
