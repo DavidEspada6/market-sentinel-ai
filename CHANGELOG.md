@@ -4,6 +4,18 @@ All notable changes to Market Sentinel AI will be documented in this file.
 
 The project follows semantic versioning once v1.0.0 is reached. Pre-1.0 releases map to the staged roadmap.
 
+## [2.7.1] - 2026-09-19
+
+### Fixed
+
+- Fixed the double-click launcher closing silently when the local UI dependencies were missing.
+- Added automatic `.venv` creation and `.[api]` dependency installation on first launch.
+- Added visible error output and a pause on launcher failure.
+
+### Changed
+
+- Kept the complete UI on port `8765` and made the launcher force the repository source tree.
+
 ## [2.7.0] - 2026-09-19
 
 ### Added

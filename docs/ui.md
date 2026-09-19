@@ -2,7 +2,9 @@
 
 ## Abrir la aplicacion
 
-1. Instala las dependencias una vez desde PowerShell:
+1. Haz doble clic en el lanzador. La primera vez creara `.venv` e instalara automaticamente las
+   dependencias de la UI. Si la instalacion falla, la ventana mostrara el motivo y no se cerrara.
+   Tambien puedes instalarlo manualmente desde PowerShell:
 
 ```powershell
 python -m venv .venv

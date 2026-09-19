@@ -5,9 +5,20 @@ import os
 import subprocess
 import sys
 import unittest
+from pathlib import Path
 
 
 class CliSmokeTests(unittest.TestCase):
+    def test_windows_launcher_self_diagnoses_and_uses_operational_ui(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        powershell = (root / "Open-Market-Sentinel.ps1").read_text(encoding="utf-8")
+        batch = (root / "Open-Market-Sentinel.bat").read_text(encoding="utf-8")
+
+        self.assertIn("Faltan dependencias de la UI", powershell)
+        self.assertIn("127.0.0.1:$port", powershell)
+        self.assertIn("8765", powershell)
+        self.assertIn("pause", batch.lower())
+
     def test_status_command_outputs_current_release(self) -> None:
         result = subprocess.run(
             [sys.executable, "-m", "market_sentinel_ai", "status"],
@@ -18,7 +29,7 @@ class CliSmokeTests(unittest.TestCase):
 
         payload = json.loads(result.stdout)
         self.assertEqual(payload["current_release"], "O7")
-        self.assertEqual(payload["current_version"], "2.7.0")
+        self.assertEqual(payload["current_version"], "2.7.1")
 
     def test_security_check_command_passes(self) -> None:
         result = subprocess.run(
