@@ -2,7 +2,7 @@
 
 Market Sentinel AI is a predictive market analysis and alerting application. Its core loop is quantitative, cheap and deterministic: market data ingestion, feature engineering, supervised models, walk-forward backtesting, risk controls and alerting. GPT-6 Astra is reserved for contextual reasoning when a signal is important enough to justify the extra cost.
 
-Market Sentinel AI v1.3.0 is an alerting and paper-trading market analysis application under active completion. It includes deterministic demo data, replaceable Yahoo Finance, Stooq and Alpha Vantage market-data adapters, quality-gated SQLite ingestion, causal OHLCV/volatility features, trainable XGBoost and LightGBM models, purged walk-forward evaluation, cost-aware backtesting, persistent operational signals, a local API and dashboard, scheduled scans, dry-run/webhook alerts, regime detection, weighted ensemble, gated GPT-6 Astra contextual reasoning, paper trading, drift checks and operational logs. It does not place live trades.
+Market Sentinel AI v1.4.0 is an alerting and paper-trading market analysis application under active completion. It includes deterministic demo data, replaceable Yahoo Finance, Stooq and Alpha Vantage market-data adapters, a public Binance order-book adapter, quality-gated SQLite ingestion, causal OHLCV/volatility features, causal multitimeframe alignment, trainable XGBoost and LightGBM models, purged walk-forward evaluation, cost-aware backtesting, persistent operational signals, a local API and dashboard, scheduled scans, dry-run/webhook alerts, order-flow features, regime-aware ensembles, gated GPT-6 Astra contextual reasoning, paper trading, drift checks and operational logs. It does not place live trades.
 
 ## Safety Position
 
@@ -52,6 +52,7 @@ python -m market_sentinel_ai walk-forward-demo --model lightgbm --symbol SPY --t
 python -m market_sentinel_ai signals-demo --symbol SPY --timeframe 5m --days 10
 python -m market_sentinel_ai dashboard-demo --symbol SPY --timeframe 5m --days 30 --output reports/dashboard.html
 python -m market_sentinel_ai ensemble-demo --symbol SPY --timeframe 5m --days 20
+python -m market_sentinel_ai order-book-demo --provider demo --symbol BTCUSDT --depth 5
 python -m market_sentinel_ai astra-context-demo --symbol SPY --timeframe 5m --days 10
 python -m market_sentinel_ai paper-demo --symbol SPY --timeframe 5m --days 10
 python -m market_sentinel_ai drift-demo --symbol SPY --timeframe 5m --days 20
@@ -89,6 +90,8 @@ Read [docs/market-data.md](docs/market-data.md) for provider setup, limits and i
 Read [docs/models.md](docs/models.md) for training, purging, artifacts and evaluation metrics.
 Read [docs/astra.md](docs/astra.md) for the R6 GPT-6 Astra integration rules.
 Read [docs/api.md](docs/api.md) for the local API, dashboard and scheduler.
+Read [docs/order-flow.md](docs/order-flow.md) for order-book, multitimeframe and regime-aware
+modeling.
 Read [docs/operations.md](docs/operations.md) for the v1 operating boundaries.
 
 ## Why Astra Is Not the Continuous Predictor

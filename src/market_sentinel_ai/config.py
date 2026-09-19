@@ -56,6 +56,14 @@ class MarketDataSettings:
 
 
 @dataclass(frozen=True)
+class OrderBookSettings:
+    provider: str
+    base_url: str
+    depth: int
+    poll_seconds: int
+
+
+@dataclass(frozen=True)
 class AlertSettings:
     dry_run: bool
     email_from: str
@@ -78,6 +86,7 @@ class Settings:
     database_url: str
     openai: OpenAISettings
     market_data: MarketDataSettings
+    order_book: OrderBookSettings
     alerts: AlertSettings
     risk: RiskSettings
 
@@ -101,6 +110,12 @@ class Settings:
                 api_key=_env_str("MARKET_DATA_API_KEY", ""),
                 base_url=_env_str("MARKET_DATA_BASE_URL", ""),
                 poll_seconds=_env_int("MARKET_DATA_POLL_SECONDS", 60),
+            ),
+            order_book=OrderBookSettings(
+                provider=_env_str("MARKET_ORDER_BOOK_PROVIDER", "demo"),
+                base_url=_env_str("MARKET_ORDER_BOOK_BASE_URL", ""),
+                depth=_env_int("MARKET_ORDER_BOOK_DEPTH", 20),
+                poll_seconds=_env_int("MARKET_ORDER_BOOK_POLL_SECONDS", 10),
             ),
             alerts=AlertSettings(
                 dry_run=_env_bool("ALERTS_DRY_RUN", True),

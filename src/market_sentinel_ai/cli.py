@@ -10,6 +10,7 @@ from market_sentinel_ai.adapters.market_data import (
     DemoMarketDataProvider,
     DemoOrderBookProvider,
     build_market_data_provider,
+    build_order_book_provider,
 )
 from market_sentinel_ai.alerts import DryRunAlertChannel
 from market_sentinel_ai.backtesting import SimpleBacktestEngine
@@ -18,6 +19,7 @@ from market_sentinel_ai.dashboard import DashboardViewModel, render_dashboard
 from market_sentinel_ai.domain.market import Timeframe
 from market_sentinel_ai.domain.risk import RiskLimits
 from market_sentinel_ai.features import (
+    AlignedMultiTimeframeFeatureEngine,
     OHLCVFeatureEngine,
     OrderFlowFeatureEngine,
     aggregate_candles,
@@ -28,7 +30,7 @@ from market_sentinel_ai.models import (
     LightGBMDirectionalModel,
     LogisticDirectionalModel,
     MomentumBaselineModel,
-    WeightedEnsembleModel,
+    RegimeAwareEnsembleModel,
     WeightedModel,
     XGBoostDirectionalModel,
 )
@@ -41,7 +43,7 @@ from market_sentinel_ai.reasoning import (
     ReasoningCache,
     ReasoningGateway,
 )
-from market_sentinel_ai.regime import VolatilityRegimeDetector
+from market_sentinel_ai.regime import Regime
 from market_sentinel_ai.releases import COMPLETION_PLAN, CURRENT_RELEASE, RELEASE_PLAN
 from market_sentinel_ai.signals import SignalEngine
 from market_sentinel_ai.storage import SQLiteCandleRepository, sqlite_path_from_url
@@ -116,6 +118,11 @@ def main() -> None:
     ensemble.add_argument("--symbol", default="SPY")
     ensemble.add_argument("--timeframe", choices=[item.value for item in Timeframe], default="5m")
     ensemble.add_argument("--days", type=int, default=20)
+
+    order_book = subparsers.add_parser("order-book-demo")
+    order_book.add_argument("--provider", choices=["demo", "binance"])
+    order_book.add_argument("--symbol", default="BTCUSDT")
+    order_book.add_argument("--depth", type=int, default=5)
 
     astra = subparsers.add_parser("astra-context-demo")
     astra.add_argument("--symbol", default="SPY")
@@ -203,6 +210,9 @@ def main() -> None:
         return
     if command == "ensemble-demo":
         _ensemble_demo(args.symbol, Timeframe(args.timeframe), args.days)
+        return
+    if command == "order-book-demo":
+        _order_book_demo(settings, args.provider, args.symbol, args.depth)
         return
     if command == "astra-context-demo":
         _astra_context_demo(settings, args.symbol, Timeframe(args.timeframe), args.days)
@@ -580,23 +590,33 @@ def _ensemble_demo(symbol: str, timeframe: Timeframe, days: int) -> None:
     provider = DemoMarketDataProvider()
     candles = list(provider.historical_candles(symbol, timeframe, start, end))
     feature_engine = OHLCVFeatureEngine(rolling_window=20)
-    features = feature_engine.transform(candles)
+    features = AlignedMultiTimeframeFeatureEngine().transform(candles)
     examples = build_directional_examples(candles, feature_engine, horizon_candles=1)
 
     logistic = LogisticDirectionalModel(horizon_minutes=5, epochs=75)
     logistic.fit(examples[:-1])
-    ensemble = WeightedEnsembleModel(
-        models=(
-            WeightedModel(
-                MomentumBaselineModel(horizon_minutes=5, momentum_threshold_bps=0.5),
-                0.4,
+    ensemble = RegimeAwareEnsembleModel(
+        models_by_regime={
+            Regime.LOW_VOLATILITY: (WeightedModel(logistic, 0.8),),
+            Regime.NORMAL: (
+                WeightedModel(
+                    MomentumBaselineModel(horizon_minutes=5, momentum_threshold_bps=0.5),
+                    0.4,
+                ),
+                WeightedModel(logistic, 0.6),
             ),
-            WeightedModel(logistic, 0.6),
-        ),
+            Regime.HIGH_VOLATILITY: (
+                WeightedModel(
+                    MomentumBaselineModel(horizon_minutes=5, momentum_threshold_bps=1.5),
+                    0.7,
+                ),
+                WeightedModel(logistic, 0.3),
+            ),
+        },
         horizon_minutes=5,
     )
     prediction = ensemble.predict(features)
-    regime = VolatilityRegimeDetector().detect(features)
+    regime = prediction.metadata["regime"]
     higher_timeframe = aggregate_candles(candles, Timeframe.FIFTEEN_MINUTES)
     order_flow_rows = OrderFlowFeatureEngine().transform(
         list(DemoOrderBookProvider().snapshots_from_candles(candles[-5:]))
@@ -608,10 +628,41 @@ def _ensemble_demo(symbol: str, timeframe: Timeframe, days: int) -> None:
                 "direction": prediction.direction.value,
                 "probability": prediction.probability,
                 "model": prediction.model_name,
-                "regime": regime.value,
+                "regime": regime,
                 "source_candles": len(candles),
                 "fifteen_minute_candles": len(higher_timeframe),
+                "aligned_feature_count": len(features),
                 "latest_order_flow": order_flow_rows[-1].values if order_flow_rows else {},
+            },
+            indent=2,
+            sort_keys=True,
+        )
+    )
+
+
+def _order_book_demo(
+    settings: Settings,
+    provider_name: str | None,
+    symbol: str,
+    depth: int,
+) -> None:
+    order_book_settings = settings.order_book
+    if provider_name is not None:
+        order_book_settings = replace(order_book_settings, provider=provider_name)
+    provider = build_order_book_provider(order_book_settings)
+    snapshot = provider.snapshot(symbol, depth)
+    features = OrderFlowFeatureEngine().transform([snapshot])[-1]
+    print(
+        json.dumps(
+            {
+                "provider": provider.provider_name,
+                "symbol": snapshot.symbol,
+                "captured_at": snapshot.captured_at.isoformat(),
+                "depth": len(snapshot.bids),
+                "best_bid": snapshot.best_bid,
+                "best_ask": snapshot.best_ask,
+                "spread_bps": snapshot.spread_bps,
+                "order_flow_features": features.values,
             },
             indent=2,
             sort_keys=True,

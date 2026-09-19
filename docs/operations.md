@@ -1,8 +1,8 @@
 # Operations
 
-The original v1.0.0 is a prototype baseline. The completion track is active; v1.3.0 adds the
-local API, operational dashboard, scheduled scans and persistent signal/alert records while
-preserving alert-only and paper-trading boundaries.
+The original v1.0.0 is a prototype baseline. The completion track is active; v1.4.0 adds public
+order-book depth, causal multitimeframe features and regime-aware ensembles while preserving
+alert-only and paper-trading boundaries.
 
 ## Supported Mode
 
@@ -24,6 +24,9 @@ preserving alert-only and paper-trading boundaries.
 - Local FastAPI service with health, status, scan, signal, alert and scheduler-run endpoints.
 - SQLite-backed operational dashboard.
 - One-shot and polling scheduler commands.
+- Public Binance depth adapter with configurable endpoint and depth.
+- Causal multitimeframe feature alignment.
+- Regime-aware ensemble predictions with regime metadata.
 
 ## Not Supported In v1
 

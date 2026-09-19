@@ -9,8 +9,8 @@ reviewable releases and ends at v2.0.0.
 | --- | --- | --- |
 | C1 | 1.1.0 | Real historical/intraday providers, ingestion quality and provenance |
 | C2 | 1.2.0 | Boosting models, model artifacts, purged walk-forward evaluation and robust backtests |
-| C3 | 1.3.0 | Local API, operational dashboard, scheduling, persistent signals and alerts (current) |
-| C4 | 1.4.0 | Real order-book data, aligned multi-timeframe features, regime-aware ensemble |
+| C3 | 1.3.0 | Local API, operational dashboard, scheduling, persistent signals and alerts |
+| C4 | 1.4.0 | Real order-book data, aligned multi-timeframe features, regime-aware ensemble (current) |
 | C5 | 1.5.0 | News context and audited GPT-6 Astra reasoning with hard cost limits |
 | C6 | 1.6.0 | Persistent paper portfolio, drift monitoring, health and recovery |
 | C7 | 2.0.0 | Integrated packaging, security checks, end-to-end tests and final documentation |

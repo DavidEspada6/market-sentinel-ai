@@ -23,6 +23,12 @@ class OrderBookSnapshot:
     bids: tuple[OrderBookLevel, ...]
     asks: tuple[OrderBookLevel, ...]
 
+    def __post_init__(self) -> None:
+        if not self.bids or not self.asks:
+            raise ValueError("order book must contain bids and asks")
+        if self.best_bid > self.best_ask:
+            raise ValueError("order book cannot be crossed")
+
     @property
     def best_bid(self) -> float:
         return max(level.price for level in self.bids)
@@ -45,4 +51,3 @@ class OrderBookSnapshot:
         ask_size = sum(level.size for level in self.asks)
         total = bid_size + ask_size
         return (bid_size - ask_size) / total if total else 0.0
-

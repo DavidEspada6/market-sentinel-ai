@@ -39,9 +39,9 @@ Market Sentinel AI is split into ports and adapters so every expensive, unreliab
 - alert channels,
 - repositories.
 
-Concrete adapters currently cover deterministic demo data, Yahoo Finance and Stooq OHLCV, and
-Alpha Vantage daily/intraday OHLCV. Provider selection is isolated behind a factory and
-environment settings.
+Concrete adapters currently cover deterministic demo data, Yahoo Finance and Stooq OHLCV,
+Alpha Vantage daily/intraday OHLCV and public Binance order-book depth. Provider selection is
+isolated behind factories and environment settings.
 
 ### Reasoning Layer
 
@@ -67,6 +67,13 @@ The C3 application exposes a local FastAPI service and HTML dashboard focused on
 alert history and scheduler health. SQLite persists candles, ingestion runs, signals, alerts and
 scheduler runs. The scheduler can run once for a controlled check or poll a watchlist until
 stopped.
+
+### Order Flow And Multi-Timeframe Features
+
+Order-book snapshots are normalized into spread, depth, imbalance, microprice and pressure-change
+features. Higher-timeframe OHLCV features are joined to a base timeframe only after the higher
+timeframe's final component candle has closed. Regime-aware ensembles select weights using the
+latest volatility regime and record that regime in prediction metadata.
 
 ## Data Flow
 

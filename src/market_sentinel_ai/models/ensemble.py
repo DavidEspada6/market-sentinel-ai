@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 from market_sentinel_ai.domain.prediction import Direction, Prediction
 from market_sentinel_ai.ports.features import FeatureRow
 from market_sentinel_ai.ports.models import PredictiveModel
+from market_sentinel_ai.regime import Regime, VolatilityRegimeDetector
 
 
 @dataclass(frozen=True)
@@ -60,3 +61,50 @@ class WeightedEnsembleModel:
             metadata=model_votes,
         )
 
+
+class RegimeAwareEnsembleModel:
+    def __init__(
+        self,
+        models_by_regime: dict[Regime, Sequence[WeightedModel]],
+        horizon_minutes: int,
+        *,
+        detector: VolatilityRegimeDetector | None = None,
+        min_confidence: float = 0.52,
+    ) -> None:
+        if not models_by_regime:
+            raise ValueError("models_by_regime cannot be empty")
+        self.models_by_regime = {
+            regime: tuple(models) for regime, models in models_by_regime.items()
+        }
+        if any(not models for models in self.models_by_regime.values()):
+            raise ValueError("every regime must have at least one model")
+        self.horizon_minutes = horizon_minutes
+        self.detector = detector or VolatilityRegimeDetector()
+        self.min_confidence = min_confidence
+
+    @property
+    def name(self) -> str:
+        return "regime-aware-ensemble"
+
+    def predict(self, features: Sequence[FeatureRow]) -> Prediction:
+        if not features:
+            raise ValueError("features cannot be empty")
+        regime = self.detector.detect(list(features))
+        selected = self.models_by_regime.get(regime)
+        if selected is None:
+            selected = next(iter(self.models_by_regime.values()))
+        prediction = WeightedEnsembleModel(
+            selected,
+            horizon_minutes=self.horizon_minutes,
+            min_confidence=self.min_confidence,
+        ).predict(features)
+        return Prediction(
+            symbol=prediction.symbol,
+            horizon_minutes=prediction.horizon_minutes,
+            direction=prediction.direction,
+            probability=prediction.probability,
+            model_name=self.name,
+            generated_at=prediction.generated_at,
+            expected_return_bps=prediction.expected_return_bps,
+            metadata={**prediction.metadata, "regime": regime.value},
+        )

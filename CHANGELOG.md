@@ -4,6 +4,21 @@ All notable changes to Market Sentinel AI will be documented in this file.
 
 The project follows semantic versioning once v1.0.0 is reached. Pre-1.0 releases map to the staged roadmap.
 
+## [1.4.0] - 2026-09-19
+
+### Added
+
+- Added a public Binance order-book adapter with normalized snapshots and configurable depth,
+  while retaining the demo adapter behind the same contract.
+- Added order-flow spread, depth, microprice and imbalance-delta features.
+- Added causal higher-timeframe feature alignment that waits for component candles to close.
+- Added a regime-aware ensemble that selects model weights for low, normal and high volatility.
+- Added \`order-book-demo\` and updated \`ensemble-demo\` to exercise the C4 path.
+
+### Changed
+
+- Updated the completion track status to C4.
+
 ## [1.3.0] - 2026-09-19
 
 ### Added
