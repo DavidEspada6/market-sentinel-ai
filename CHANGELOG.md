@@ -4,6 +4,17 @@ All notable changes to Market Sentinel AI will be documented in this file.
 
 The project follows semantic versioning once v1.0.0 is reached. Pre-1.0 releases map to the staged roadmap.
 
+## [0.4.0] - 2026-09-19
+
+### Added
+
+- Added supervised directional dataset builder with future-label shifting.
+- Added lightweight logistic directional model for dependency-free CI and local experimentation.
+- Added optional XGBoost/LightGBM adapter placeholders behind explicit ML extras.
+- Added walk-forward splitter and evaluator with coverage, accuracy, precision, recall and F1 metrics.
+- Added CLI command for demo walk-forward evaluation.
+- Added tests for labels, model fitting and walk-forward reports.
+
 ## [0.3.0] - 2026-09-19
 
 ### Added

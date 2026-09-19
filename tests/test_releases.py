@@ -15,9 +15,9 @@ class ReleasePlanTests(unittest.TestCase):
         versions = [release.version for release in RELEASE_PLAN]
         self.assertEqual(len(versions), len(set(versions)))
 
-    def test_current_release_is_r2(self) -> None:
-        self.assertEqual(CURRENT_RELEASE.code, "R2")
-        self.assertEqual(CURRENT_RELEASE.version, "0.3.0")
+    def test_current_release_is_r3(self) -> None:
+        self.assertEqual(CURRENT_RELEASE.code, "R3")
+        self.assertEqual(CURRENT_RELEASE.version, "0.4.0")
 
 
 if __name__ == "__main__":
