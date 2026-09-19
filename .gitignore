@@ -17,10 +17,10 @@ build/
 .env
 .env.*
 !.env.example
-data/
-models/
-reports/
-logs/
+/data/
+/models/
+/reports/
+/logs/
 *.sqlite
 *.sqlite3
 *.db

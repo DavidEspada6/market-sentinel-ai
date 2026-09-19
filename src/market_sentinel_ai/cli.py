@@ -5,8 +5,11 @@ import json
 from datetime import UTC, datetime, timedelta
 
 from market_sentinel_ai.adapters.market_data import DemoMarketDataProvider
+from market_sentinel_ai.backtesting import SimpleBacktestEngine
 from market_sentinel_ai.config import Settings
 from market_sentinel_ai.domain.market import Timeframe
+from market_sentinel_ai.features import OHLCVFeatureEngine
+from market_sentinel_ai.models import MomentumBaselineModel
 from market_sentinel_ai.releases import CURRENT_RELEASE, RELEASE_PLAN
 from market_sentinel_ai.storage import SQLiteCandleRepository, sqlite_path_from_url
 
@@ -26,6 +29,11 @@ def main() -> None:
     list_candles.add_argument("--timeframe", choices=[item.value for item in Timeframe], default="5m")
     list_candles.add_argument("--days", type=int, default=5)
 
+    backtest = subparsers.add_parser("backtest-demo")
+    backtest.add_argument("--symbol", default="SPY")
+    backtest.add_argument("--timeframe", choices=[item.value for item in Timeframe], default="5m")
+    backtest.add_argument("--days", type=int, default=10)
+
     args = parser.parse_args()
     command = args.command or "status"
     settings = Settings.from_env()
@@ -37,6 +45,9 @@ def main() -> None:
         return
     if command == "list-candles":
         _list_candles(settings, args.symbol, Timeframe(args.timeframe), args.days)
+        return
+    if command == "backtest-demo":
+        _backtest_demo(settings, args.symbol, Timeframe(args.timeframe), args.days)
         return
     parser.error(f"unknown command: {command}")
 
@@ -95,3 +106,37 @@ def _list_candles(settings: Settings, symbol: str, timeframe: Timeframe, days: i
         for candle in candles[-10:]
     ]
     print(json.dumps(payload, indent=2, sort_keys=True))
+
+
+def _backtest_demo(settings: Settings, symbol: str, timeframe: Timeframe, days: int) -> None:
+    end = datetime.now(tz=UTC).replace(second=0, microsecond=0)
+    start = end - timedelta(days=days)
+    provider = DemoMarketDataProvider()
+    candles = list(provider.historical_candles(symbol, timeframe, start, end))
+    engine = SimpleBacktestEngine(
+        feature_engine=OHLCVFeatureEngine(rolling_window=20),
+        model=MomentumBaselineModel(horizon_minutes=5),
+        fee_bps=settings.risk.default_fee_bps,
+        slippage_bps=settings.risk.default_slippage_bps,
+    )
+    report = engine.run(candles)
+    print(
+        json.dumps(
+            {
+                "symbol": symbol.upper(),
+                "timeframe": timeframe.value,
+                "days": days,
+                "trades": report.trades,
+                "win_rate": report.win_rate,
+                "expectancy_bps": report.expectancy_bps,
+                "profit_factor": report.profit_factor,
+                "sharpe": report.sharpe,
+                "sortino": report.sortino,
+                "max_drawdown_pct": report.max_drawdown_pct,
+                "fees_bps": settings.risk.default_fee_bps,
+                "slippage_bps": settings.risk.default_slippage_bps,
+            },
+            indent=2,
+            sort_keys=True,
+        )
+    )

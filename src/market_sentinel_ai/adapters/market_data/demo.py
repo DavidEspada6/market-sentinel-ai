@@ -35,13 +35,13 @@ class DemoMarketDataProvider:
 
         while current < end_utc:
             rng = random.Random(f"{symbol}:{timeframe}:{current.isoformat()}")
-            drift = math.sin(index / 11) * 0.08
-            shock = rng.uniform(-0.35, 0.35)
+            drift = math.sin(index / 11) * 2.5
+            shock = rng.uniform(-6.0, 6.0)
             open_price = price
             close_price = max(0.01, open_price * (1 + (drift + shock) / 10_000))
-            high = max(open_price, close_price) * (1 + abs(rng.uniform(0.1, 0.9)) / 10_000)
-            low = min(open_price, close_price) * (1 - abs(rng.uniform(0.1, 0.9)) / 10_000)
-            volume = 100_000 + rng.randint(0, 25_000) + int(abs(shock) * 5_000)
+            high = max(open_price, close_price) * (1 + abs(rng.uniform(1.0, 8.0)) / 10_000)
+            low = min(open_price, close_price) * (1 - abs(rng.uniform(1.0, 8.0)) / 10_000)
+            volume = 100_000 + rng.randint(0, 25_000) + int(abs(shock) * 1_000)
 
             yield Candle(
                 symbol=symbol.upper(),
@@ -76,4 +76,3 @@ def _as_utc(value: datetime) -> datetime:
 def _initial_price(symbol: str) -> float:
     seed = sum(ord(char) for char in symbol.upper())
     return 50.0 + (seed % 450)
-

@@ -4,6 +4,16 @@ All notable changes to Market Sentinel AI will be documented in this file.
 
 The project follows semantic versioning once v1.0.0 is reached. Pre-1.0 releases map to the staged roadmap.
 
+## [0.3.0] - 2026-09-19
+
+### Added
+
+- Added OHLCV feature engine with rolling return, volatility, wick/body and volume features.
+- Added deterministic momentum baseline model producing LONG/SHORT/NO TRADE predictions.
+- Added simple one-candle-ahead backtester that enters on the next candle and includes fees/slippage.
+- Added CLI command for demo backtests.
+- Added tests for features, baseline model and backtest metrics.
+
 ## [0.2.0] - 2026-09-19
 
 ### Added
