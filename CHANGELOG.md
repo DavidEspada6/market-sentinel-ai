@@ -4,6 +4,20 @@ All notable changes to Market Sentinel AI will be documented in this file.
 
 The project follows semantic versioning once v1.0.0 is reached. Pre-1.0 releases map to the staged roadmap.
 
+## [2.3.0] - 2026-09-19
+
+### Added
+
+- Added structured trade plans to persisted signals with entry price, stop/invalidation, target,
+  reward/risk ratio, validity horizon and exit guidance.
+- Added explicit `ENTER_LONG`, `ENTER_SHORT` and `WAIT` plan actions.
+- Added O3 tests for actionable and no-trade plan behavior.
+
+### Changed
+
+- Promoted the operational product track to O3 `2.3.0`.
+- Kept plans advisory and paper-only; they never create real orders.
+
 ## [2.2.0] - 2026-09-19
 
 ### Added

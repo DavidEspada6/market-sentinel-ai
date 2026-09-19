@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
@@ -12,7 +12,7 @@ from market_sentinel_ai.domain.operations import AlertRecord, SignalRecord
 from market_sentinel_ai.features import OHLCVFeatureEngine
 from market_sentinel_ai.ingestion import MarketDataIngestionService
 from market_sentinel_ai.models import MomentumBaselineModel
-from market_sentinel_ai.signals import SignalEngine
+from market_sentinel_ai.signals import SignalEngine, build_trade_plan
 from market_sentinel_ai.storage import SQLiteCandleRepository, sqlite_path_from_url
 
 
@@ -74,7 +74,15 @@ class MarketScanService:
             min_probability=0.55,
             min_expected_return_bps=round_trip_cost_bps,
         ).from_prediction(prediction)
+        plan = build_trade_plan(
+            signal,
+            candles[-1],
+            features[-1],
+            timeframe,
+            round_trip_cost_bps,
+        )
         record = SignalRecord.from_signal(str(uuid4()), timeframe.value, signal)
+        record = replace(record, metadata={**record.metadata, **plan.to_metadata()})
         self.repository.record_signal(record)
 
         alerts: list[AlertRecord] = []
