@@ -2,7 +2,7 @@
 
 Market Sentinel AI is a predictive market analysis and alerting application. Its core loop is quantitative, cheap and deterministic: market data ingestion, feature engineering, supervised models, walk-forward backtesting, risk controls and alerting. GPT-6 Astra is reserved for contextual reasoning when a signal is important enough to justify the extra cost.
 
-Market Sentinel AI v2.6.0 is the operational alerting and paper-trading market analysis application. It includes deterministic demo data, replaceable Yahoo Finance, Stooq and Alpha Vantage market-data adapters, provider-backed Yahoo instrument search, a public Binance order-book adapter, RSS/Atom news context, quality-gated SQLite ingestion, causal OHLCV/volatility features, causal multitimeframe alignment, trainable XGBoost and LightGBM models, purged walk-forward evaluation, cost-aware backtesting, persistent operational signals with entry/stop/target plans, paper risk analytics for estimated/realized PnL, VaR/CVaR, volatility, Sharpe, Sortino and drawdown, a local API and dashboard, scheduled scans with alert deduplication, a curated multi-asset universe, searchable persistent watchlists with provider metadata, interactive color charts with selectable time windows and approximate future envelopes, dry-run/webhook alerts, order-flow features, regime-aware ensembles, gated and budget-audited GPT-6 Astra contextual reasoning, persistent paper accounts and trades, drift and health history, recovery backups, operational logs, a repository security gate and end-to-end release tests. It does not place live trades.
+Market Sentinel AI v2.7.0 is the operational alerting and paper-trading market analysis application. It includes deterministic demo data, replaceable Yahoo Finance, Stooq and Alpha Vantage market-data adapters, provider-backed Yahoo instrument search, a public Binance order-book adapter, RSS/Atom news context, quality-gated SQLite ingestion, causal OHLCV/volatility features, causal multitimeframe alignment, trainable XGBoost and LightGBM models, purged walk-forward evaluation, cost-aware backtesting, persistent operational signals with entry/stop/target plans, paper risk analytics for estimated/realized PnL, VaR/CVaR, volatility, Sharpe, Sortino and drawdown, a complete local control center with manual and periodic scans, a searchable persistent watchlist, interactive color charts with selectable time windows and approximate future envelopes, paper-trade history, health, drift and Astra usage panels, dry-run/webhook alerts, order-flow features, regime-aware ensembles, gated and budget-audited GPT-6 Astra contextual reasoning, persistent paper accounts and trades, recovery backups, operational logs, a repository security gate and end-to-end release tests. It does not place live trades.
 
 ## Safety Position
 
@@ -66,11 +66,14 @@ python -m market_sentinel_ai paper-demo --symbol SPY --timeframe 5m --days 10
 python -m market_sentinel_ai drift-demo --symbol SPY --timeframe 5m --days 20
 python -m market_sentinel_ai scan --symbol SPY --timeframe 5m --days 5
 python -m market_sentinel_ai schedule --symbols SPY,QQQ --timeframe 5m --once
-python -m market_sentinel_ai serve --host 127.0.0.1 --port 8000
+python -m market_sentinel_ai serve --host 127.0.0.1 --port 8765
 ```
 
+`dashboard-demo` creates a static report only. For the complete UI, use `Open-Market-Sentinel.bat`
+or the `serve` command below.
+
 For the visual workspace, after installing the API extra, double-click `Open-Market-Sentinel.bat`.
-It starts the local dashboard and opens [http://127.0.0.1:8000](http://127.0.0.1:8000). See
+It starts the complete operational dashboard and opens [http://127.0.0.1:8765](http://127.0.0.1:8765). See
 [docs/ui.md](docs/ui.md) for the watchlist, chart filters and the approximate future scenario
 display.
 

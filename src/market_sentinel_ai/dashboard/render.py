@@ -99,6 +99,8 @@ def render_dashboard(model: DashboardViewModel) -> str:
     .track {{ height: 12px; background: #edf1f3; border-radius: 999px; overflow: hidden; }}
     .fill {{ height: 100%; background: var(--teal); }}
     .muted {{ color: var(--muted); }}
+    .static-report-note {{ background: #fff8e6; border-left: 3px solid var(--amber); padding: 10px 12px;
+      color: #72520f; font-size: 13px; margin-bottom: 14px; }}
     @media (max-width: 760px) {{
       header {{ align-items: flex-start; flex-direction: column; }}
       main {{ padding: 14px; }}
@@ -113,6 +115,10 @@ def render_dashboard(model: DashboardViewModel) -> str:
     <div class="muted">{escape(model.generated_at_iso)}</div>
   </header>
   <main>
+    <div class="static-report-note">Este es un informe estatico. Para usar la UI completa con
+      watchlist, escaneo, graficos, riesgo, paper trading y diagnosticos, abre
+      <a href="http://127.0.0.1:8765">http://127.0.0.1:8765</a> mediante
+      <code>Open-Market-Sentinel.bat</code>.</div>
     <div class="grid">
       {_metric_panel("Trades", str(model.backtest.trades))}
       {_metric_panel("Expectancy", f"{model.backtest.expectancy_bps:.2f} bps")}
@@ -250,6 +256,34 @@ def render_operational_dashboard(
     .summary {{ display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }}
     .metric {{ border-left: 3px solid var(--teal); padding-left: 12px; }}
     .metric strong {{ display: block; font-size: 24px; margin-top: 4px; }}
+    .control-heading {{ display: flex; justify-content: space-between; align-items: center;
+      gap: 12px; margin-bottom: 12px; }}
+    .control-grid {{ display: flex; flex-wrap: wrap; align-items: end; gap: 10px; }}
+    .control-field {{ display: grid; gap: 5px; color: var(--muted); font-size: 12px; }}
+    .control-field select, .control-field input {{ min-width: 115px; }}
+    .operation-status {{ min-height: 20px; color: var(--muted); margin-top: 12px; }}
+    .system-grid {{ display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px;
+      margin-top: 14px; }}
+    .system-item {{ border-left: 3px solid var(--line); padding-left: 10px; }}
+    .system-item span {{ display: block; color: var(--muted); font-size: 11px; text-transform: uppercase; }}
+    .system-item strong {{ display: block; margin-top: 4px; font-size: 15px; }}
+    .system-item.ok {{ border-color: var(--green); }}
+    .system-item.warn {{ border-color: var(--amber); }}
+    .risk-grid {{ display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }}
+    .risk-item {{ border-left: 3px solid var(--blue); padding: 6px 0 6px 10px; }}
+    .risk-item span {{ display: block; color: var(--muted); font-size: 11px; text-transform: uppercase; }}
+    .risk-item strong {{ display: block; margin-top: 4px; font-size: 16px; }}
+    .data-layout {{ display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(260px, 1fr); gap: 16px; }}
+    .data-layout h3 {{ font-size: 14px; margin: 0 0 10px; }}
+    .diagnostic-grid {{ display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }}
+    .diagnostic-item {{ border: 1px solid var(--line); padding: 10px; }}
+    .diagnostic-item span {{ display: block; color: var(--muted); font-size: 11px; text-transform: uppercase; }}
+    .diagnostic-item strong {{ display: block; margin-top: 4px; font-size: 15px; }}
+    .diagnostic-item small {{ display: block; color: var(--muted); margin-top: 4px; }}
+    .trade-table {{ max-height: 250px; overflow: auto; }}
+    .trade-table table {{ min-width: 560px; }}
+    .static-report-note {{ background: #fff8e6; border-left: 3px solid var(--amber); padding: 10px 12px;
+      color: #72520f; font-size: 13px; margin-bottom: 14px; }}
     table {{ width: 100%; border-collapse: collapse; background: var(--panel); }}
     th, td {{ border-bottom: 1px solid var(--line); padding: 10px 12px; text-align: left; }}
     th {{ color: var(--muted); font-size: 12px; text-transform: uppercase; }}
@@ -294,7 +328,8 @@ def render_operational_dashboard(
       .panel {{ overflow-x: auto; }} table {{ min-width: 680px; }}
       .market-heading {{ flex-direction: column; }} .market-badges {{ justify-content: flex-start; }}
       .chart-summary {{ grid-template-columns: repeat(2, minmax(0, 1fr)); }}
-      .window-buttons {{ min-width: 620px; }} }}
+      .window-buttons {{ min-width: 620px; }} .system-grid, .risk-grid {{ grid-template-columns: repeat(2, minmax(0, 1fr)); }}
+      .data-layout {{ grid-template-columns: 1fr; }} .diagnostic-grid {{ grid-template-columns: 1fr; }} }}
   </style>
 </head>
 <body>
@@ -317,6 +352,35 @@ def render_operational_dashboard(
       {_operational_metric("VaR 95%", _format_money(risk_metrics.get("var_95")))}
       {_operational_metric("Max Drawdown", _format_percent(risk_metrics.get("max_drawdown_pct")))}
     </div>
+    <section><div class="panel">
+      <div class="control-heading"><h2>Centro de control</h2>
+        <span class="pill wait" id="real-orders-badge">ORDENES REALES DESACTIVADAS</span></div>
+      <div class="control-grid">
+        <label class="control-field">Timeframe de escaneo
+          <select id="scan-timeframe"><option value="1m">1 minuto</option>
+            <option value="5m" selected>5 minutos</option><option value="15m">15 minutos</option>
+            <option value="1h">1 hora</option><option value="1d">1 día</option></select>
+        </label>
+        <label class="control-field">Historial a revisar
+          <input id="scan-days" type="number" min="1" max="3650" value="5"></label>
+        <button type="button" id="scan-watchlist">Escanear watchlist</button>
+        <label class="control-field">Escaneo periódico
+          <select id="scan-interval"><option value="0">Desactivado</option>
+            <option value="60000">Cada 1 minuto</option><option value="300000">Cada 5 minutos</option>
+            <option value="900000">Cada 15 minutos</option><option value="3600000">Cada hora</option></select>
+        </label>
+        <button type="button" class="secondary" id="scan-periodic">Activar periódico</button>
+        <button type="button" class="secondary" id="refresh-live">Actualizar datos</button>
+      </div>
+      <div class="operation-status" id="operation-status" aria-live="polite">Listo para analizar la watchlist.</div>
+      <div class="system-grid">
+        <div class="system-item" id="system-health"><span>Servicio</span><strong id="live-service">Cargando</strong></div>
+        <div class="system-item"><span>Proveedor</span><strong id="live-provider">-</strong></div>
+        <div class="system-item"><span>Watchlist</span><strong id="live-watchlist">-</strong></div>
+        <div class="system-item"><span>Último escaneo</span><strong id="live-scan">-</strong></div>
+        <div class="system-item"><span>Cuenta paper</span><strong id="live-equity">-</strong></div>
+      </div>
+    </div></section>
     <section><div class="panel"><h2>Watchlist</h2>
       <form class="searchbar" id="instrument-search">
         <input id="instrument-query" type="search" placeholder="Search symbol or name"
@@ -336,7 +400,6 @@ def render_operational_dashboard(
           <option value="provider">Provider only</option>
         </select>
         <button type="submit">Search</button>
-        <button type="button" class="secondary" id="scan-watchlist">Scan now</button>
       </form>
       <div id="instrument-results" class="search-results" aria-live="polite"></div>
       <div id="watchlist-status" class="status" aria-live="polite"></div>
@@ -366,6 +429,47 @@ def render_operational_dashboard(
         <span class="legend-item target">Objetivo</span><span class="legend-item stop">Stop</span></div>
       <div class="forecast-note" id="market-disclaimer">Las líneas futuras aparecerán al seleccionar un activo.</div>
     </div></section>
+    <section><div class="panel">
+      <h2>Paper trading y riesgo</h2>
+      <div class="risk-grid" id="paper-metrics">
+        <div class="risk-item"><span>PnL estimado</span><strong data-metric="estimated_pnl">-</strong></div>
+        <div class="risk-item"><span>PnL realizado</span><strong data-metric="realized_pnl">-</strong></div>
+        <div class="risk-item"><span>PnL total</span><strong data-metric="total_pnl">-</strong></div>
+        <div class="risk-item"><span>VaR 95%</span><strong data-metric="var_95">-</strong></div>
+        <div class="risk-item"><span>CVaR 95%</span><strong data-metric="cvar_95">-</strong></div>
+        <div class="risk-item"><span>Volatilidad</span><strong data-metric="volatility_pct">-</strong></div>
+        <div class="risk-item"><span>Sharpe</span><strong data-metric="sharpe">-</strong></div>
+        <div class="risk-item"><span>Sortino</span><strong data-metric="sortino">-</strong></div>
+        <div class="risk-item"><span>Max drawdown</span><strong data-metric="max_drawdown_pct">-</strong></div>
+        <div class="risk-item"><span>Profit factor</span><strong data-metric="profit_factor">-</strong></div>
+        <div class="risk-item"><span>Win rate</span><strong data-metric="win_rate">-</strong></div>
+        <div class="risk-item"><span>Expectancy</span><strong data-metric="expectancy">-</strong></div>
+        <div class="risk-item"><span>Exposición</span><strong data-metric="exposure">-</strong></div>
+        <div class="risk-item"><span>Operaciones</span><strong data-metric="trades">-</strong></div>
+        <div class="risk-item"><span>Muestra VaR</span><strong data-metric="sample_size">-</strong></div>
+      </div>
+      <div class="data-layout" style="margin-top: 18px;">
+        <div><h3>Operaciones simuladas</h3><div class="trade-table">
+          <table><thead><tr><th>Symbol</th><th>Dirección</th><th>Entrada</th><th>Salida</th><th>PnL</th></tr></thead>
+          <tbody id="paper-trades-rows"><tr><td colspan="5" class="muted">Cargando operaciones paper...</td></tr></tbody></table>
+        </div></div>
+        <div><h3>Cuenta paper</h3><div class="diagnostic-grid">
+          <div class="diagnostic-item"><span>Capital inicial</span><strong id="paper-starting-equity">-</strong></div>
+          <div class="diagnostic-item"><span>Equity actual</span><strong id="paper-current-equity">-</strong></div>
+          <div class="diagnostic-item"><span>Estado</span><strong id="paper-execution-state">Solo simulación</strong></div>
+          <div class="diagnostic-item"><span>Actualizada</span><strong id="paper-updated-at">-</strong></div>
+        </div></div>
+      </div>
+    </div></section>
+    <section><div class="panel">
+      <h2>Salud, drift y contexto</h2>
+      <div class="diagnostic-grid">
+        <div class="diagnostic-item"><span>Salud de la aplicacion</span><strong id="health-status">Cargando</strong><small id="health-detail">-</small></div>
+        <div class="diagnostic-item"><span>Drift de modelo</span><strong id="drift-status">Cargando</strong><small id="drift-detail">-</small></div>
+        <div class="diagnostic-item"><span>Uso de Astra</span><strong id="astra-usage">Cargando</strong><small id="astra-cost">-</small></div>
+        <div class="diagnostic-item"><span>Ultima ejecucion</span><strong id="run-status">Cargando</strong><small id="run-detail">-</small></div>
+      </div>
+    </div></section>
     <section><div class="panel"><h2>Latest signals</h2>
       <table><thead><tr><th>Symbol</th><th>Timeframe</th><th>Direction</th><th>Confidence</th>
         <th>Model</th><th>Generated</th></tr></thead><tbody>{signal_rows}</tbody></table>
@@ -394,6 +498,104 @@ def render_operational_dashboard(
     const defaultSymbol = "{escape(default_symbol)}";
     let selectedSymbol = defaultSymbol;
     let selectedWindow = '1d';
+    let periodicTimer = null;
+    let lastChartPayload = null;
+    const operationStatus = document.getElementById('operation-status');
+    const scanTimeframe = document.getElementById('scan-timeframe');
+    const scanDays = document.getElementById('scan-days');
+    const scanInterval = document.getElementById('scan-interval');
+    const periodicButton = document.getElementById('scan-periodic');
+    const realOrdersBadge = document.getElementById('real-orders-badge');
+
+    function setOperationStatus(message) {{ operationStatus.textContent = message; }}
+
+    function safeText(value) {{
+      return value === null || value === undefined || value === '' ? '-' : String(value);
+    }}
+
+    function formatMoneyValue(value) {{
+      return typeof value === 'number' ? value.toLocaleString(undefined, {{maximumFractionDigits: 2}}) : '-';
+    }}
+
+    function formatMetric(name, value) {{
+      if (value === null || value === undefined) return '-';
+      if (name.endsWith('_pct') || name === 'win_rate') return `${{Number(value).toFixed(2)}}%`;
+      if (name === 'estimated_pnl' || name === 'realized_pnl' || name === 'unrealized_pnl' ||
+          name === 'total_pnl' || name === 'var_95' || name === 'cvar_95' || name === 'exposure')
+        return formatMoneyValue(Number(value));
+      if (typeof value === 'number') return Number.isInteger(value) ? String(value) : Number(value).toFixed(2);
+      return String(value);
+    }}
+
+    async function fetchJson(url) {{
+      const response = await fetch(url);
+      return response.ok ? response.json() : null;
+    }}
+
+    async function loadOperationalData() {{
+      const [statusData, summaryData, accountData, metricsData, healthData, driftData, astraData, tradesData] =
+        await Promise.all([
+          fetchJson('/api/v1/status'), fetchJson('/api/v1/operations/summary'),
+          fetchJson('/api/v1/paper/account'), fetchJson('/api/v1/paper/metrics'),
+          fetchJson('/api/v1/health/details'), fetchJson('/api/v1/drift?limit=1'),
+          fetchJson('/api/v1/astra-usage'), fetchJson('/api/v1/paper/trades?limit=50')
+        ]);
+      if (statusData) {{
+        document.getElementById('live-service').textContent = `${{statusData.release}} · ${{statusData.version}}`;
+        document.getElementById('live-provider').textContent = safeText(statusData.provider);
+        realOrdersBadge.textContent = statusData.real_orders_enabled ? 'ORDENES REALES ACTIVAS' : 'ORDENES REALES DESACTIVADAS';
+        realOrdersBadge.className = statusData.real_orders_enabled ? 'pill short' : 'pill wait';
+      }}
+      if (summaryData) {{
+        document.getElementById('live-watchlist').textContent = safeText(summaryData.watchlist_count);
+        const run = summaryData.last_scheduler_run;
+        document.getElementById('live-scan').textContent = run ? safeText(run.status) : 'Sin ejecuciones';
+        document.getElementById('run-status').textContent = run ? safeText(run.status) : 'Sin ejecuciones';
+        document.getElementById('run-detail').textContent = run ?
+          `${{run.signal_count}} señales · ${{run.alert_count}} alertas` : '-';
+      }}
+      if (accountData) {{
+        document.getElementById('live-equity').textContent = formatMoneyValue(accountData.equity);
+        document.getElementById('paper-starting-equity').textContent = formatMoneyValue(accountData.starting_equity);
+        document.getElementById('paper-current-equity').textContent = formatMoneyValue(accountData.equity);
+        document.getElementById('paper-execution-state').textContent = accountData.real_execution_enabled ?
+          'Revisar configuracion' : 'Solo simulacion';
+        document.getElementById('paper-updated-at').textContent = safeText(accountData.updated_at);
+      }}
+      if (metricsData) {{
+        document.querySelectorAll('[data-metric]').forEach((node) => {{
+          const name = node.dataset.metric; node.textContent = formatMetric(name, metricsData[name]);
+        }});
+      }}
+      if (healthData) {{
+        const okay = healthData.status === 'ok';
+        document.getElementById('health-status').textContent = okay ? 'Operativa' : 'Degradada';
+        document.getElementById('health-detail').textContent = safeText(healthData.checked_at);
+        document.getElementById('system-health').className = `system-item ${{okay ? 'ok' : 'warn'}}`;
+      }}
+      document.getElementById('drift-status').textContent = driftData && driftData.length ?
+        safeText(driftData[0].status || 'Registrado') : 'Sin informes';
+      document.getElementById('drift-detail').textContent = driftData && driftData.length ?
+        safeText(driftData[0].created_at || driftData[0].timestamp) : 'Aun no hay drift persistido';
+      if (astraData) {{
+        document.getElementById('astra-usage').textContent = `${{astraData.requests}} / ${{astraData.max_requests_per_day}} solicitudes`;
+        document.getElementById('astra-cost').textContent = `Coste estimado $${{Number(astraData.estimated_cost_usd || 0).toFixed(4)}}`;
+      }}
+      if (tradesData) {{
+        const tradeRows = document.getElementById('paper-trades-rows');
+        tradeRows.replaceChildren();
+        if (!tradesData.length) {{
+          tradeRows.innerHTML = '<tr><td colspan="5" class="muted">Aun no hay operaciones simuladas.</td></tr>';
+        }} else {{
+          tradesData.slice().reverse().forEach((trade) => {{
+            const row = document.createElement('tr');
+            [trade.symbol, trade.direction, formatPrice(trade.entry_price), formatPrice(trade.exit_price), formatMoneyValue(trade.pnl)]
+              .forEach((value) => {{ const cell = document.createElement('td'); cell.textContent = safeText(value); row.appendChild(cell); }});
+            tradeRows.appendChild(row);
+          }});
+        }}
+      }}
+    }}
 
     function setStatus(message) {{ status.textContent = message; }}
 
@@ -501,6 +703,7 @@ def render_operational_dashboard(
       const response = await fetch(`/api/v1/market/${{encodeURIComponent(symbol)}}?window=${{windowValue}}`);
       if (!response.ok) {{ marketMeta.textContent = 'No hay datos para este intervalo.'; return; }}
       const payload = await response.json();
+      lastChartPayload = payload;
       marketTitle.textContent = `${{payload.symbol}} · ${{payload.name}}`;
       marketMeta.textContent = `${{payload.window_label}} · ${{payload.candle_count}} velas · ` +
         `${{payload.timeframe}} · ${{payload.currency}}`;
@@ -567,17 +770,49 @@ def render_operational_dashboard(
       button.addEventListener('click', () => loadMarket(selectedSymbol, button.dataset.window));
     }});
     window.addEventListener('resize', () => {{
-      if (selectedSymbol) loadMarket(selectedSymbol, selectedWindow);
+      if (lastChartPayload) drawMarketChart(lastChartPayload);
     }});
     if (defaultSymbol) loadMarket(defaultSymbol, selectedWindow);
-    document.getElementById('scan-watchlist').addEventListener('click', async () => {{
-      setStatus('Scanning watchlist...');
+    let scanInFlight = false;
+    async function runWatchlistScan() {{
+      if (scanInFlight) return;
+      scanInFlight = true;
+      setStatus('Escaneando watchlist...'); setOperationStatus('Analizando todos los activos de la watchlist...');
       const response = await fetch('/api/v1/watchlist/scan', {{
         method: 'POST', headers: {{'Content-Type': 'application/json'}},
-        body: JSON.stringify({{timeframe: '5m', days: 5}})
+        body: JSON.stringify({{timeframe: scanTimeframe.value, days: Number(scanDays.value)}})
       }});
-      setStatus(response.ok ? 'Scan completed; refresh to see new signals' : 'Scan failed');
+      if (response.ok) {{
+        const payload = await response.json();
+        const run = payload.run || {{}};
+        const message = `Escaneo terminado: ${{run.signal_count || 0}} señales y ${{run.alert_count || 0}} alertas.`;
+        setStatus(message); setOperationStatus(message); await loadOperationalData();
+        window.setTimeout(() => window.location.reload(), 350);
+      }} else {{
+        const error = await response.json().catch(() => ({{}}));
+        const message = error.detail || 'El escaneo no se pudo completar.';
+        setStatus(message); setOperationStatus(message);
+      }}
+      scanInFlight = false;
+    }}
+    function togglePeriodicScan() {{
+      if (periodicTimer) {{
+        window.clearInterval(periodicTimer); periodicTimer = null;
+        periodicButton.textContent = 'Activar periódico'; setOperationStatus('Escaneo periódico detenido.'); return;
+      }}
+      const milliseconds = Number(scanInterval.value);
+      if (!milliseconds) {{ setOperationStatus('Selecciona una frecuencia para activar el escaneo periódico.'); return; }}
+      periodicTimer = window.setInterval(runWatchlistScan, milliseconds);
+      periodicButton.textContent = 'Detener periódico';
+      setOperationStatus(`Escaneo periódico activo cada ${{scanInterval.options[scanInterval.selectedIndex].text}}.`);
+    }}
+    document.getElementById('scan-watchlist').addEventListener('click', runWatchlistScan);
+    periodicButton.addEventListener('click', togglePeriodicScan);
+    document.getElementById('refresh-live').addEventListener('click', async () => {{
+      setOperationStatus('Actualizando métricas y estado...'); await loadOperationalData();
+      setOperationStatus('Datos actualizados.');
     }});
+    loadOperationalData().catch(() => setOperationStatus('No se pudo cargar el estado operativo.'));
   </script>
 </body>
 </html>

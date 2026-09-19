@@ -83,8 +83,8 @@ class SignalAlertDashboardTests(unittest.TestCase):
         self.assertIn("Market Sentinel AI", html)
         self.assertIn("SPY", html)
         self.assertIn("LONG", html)
+        self.assertIn("informe estatico", html)
 
 
 if __name__ == "__main__":
     unittest.main()
-

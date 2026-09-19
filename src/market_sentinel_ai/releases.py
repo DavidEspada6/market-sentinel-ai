@@ -178,6 +178,15 @@ FOLLOW_ON_PLAN: tuple[Release, ...] = (
     ),
     Release(
         code="O7",
+        version="2.7.0",
+        title="Complete UI Control Center",
+        objective=(
+            "Expose scanning, periodic operations, paper risk, trade history, health, drift and "
+            "context usage from the local UI without requiring CLI commands."
+        ),
+    ),
+    Release(
+        code="O8",
         version="3.0.0",
         title="Optional Broker Integration Review",
         objective=(
@@ -187,4 +196,4 @@ FOLLOW_ON_PLAN: tuple[Release, ...] = (
     ),
 )
 
-CURRENT_RELEASE = FOLLOW_ON_PLAN[5]
+CURRENT_RELEASE = FOLLOW_ON_PLAN[6]

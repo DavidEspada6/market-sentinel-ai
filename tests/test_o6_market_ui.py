@@ -114,6 +114,9 @@ class O6MarketUITests(unittest.TestCase):
             self.assertIn('class="watchlist-row"', html)
             self.assertIn('data-window="1mo"', html)
             self.assertIn("/api/v1/market/", html)
+            self.assertIn('id="scan-periodic"', html)
+            self.assertIn('id="paper-metrics"', html)
+            self.assertIn('id="health-status"', html)
 
 
 if __name__ == "__main__":

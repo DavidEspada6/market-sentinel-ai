@@ -4,6 +4,20 @@ All notable changes to Market Sentinel AI will be documented in this file.
 
 The project follows semantic versioning once v1.0.0 is reached. Pre-1.0 releases map to the staged roadmap.
 
+## [2.7.0] - 2026-09-19
+
+### Added
+
+- Added a complete UI control center for manual and browser-managed periodic watchlist scans.
+- Added visible live service/provider state, last scan status and paper account equity.
+- Added all paper risk metrics, simulated trade history, health, drift and Astra usage panels.
+- Added a clear distinction between the static `dashboard-demo` report and the operational UI.
+
+### Changed
+
+- Changed the default local UI port to `8765`, configurable with `MARKET_SENTINEL_PORT`.
+- Promoted the operational product track to O7 `2.7.0`; broker review is now O8 `3.0.0`.
+
 ## [2.6.0] - 2026-09-19
 
 ### Added

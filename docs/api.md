@@ -4,7 +4,7 @@ C3 provides a local FastAPI service. Start it with:
 
 \`\`\`powershell
 python -m pip install -e ".[dev,ml,api]"
-python -m market_sentinel_ai serve --host 127.0.0.1 --port 8000
+python -m market_sentinel_ai serve --host 127.0.0.1 --port 8765
 \`\`\`
 
 The default binding is local-only. The service does not place real orders.
