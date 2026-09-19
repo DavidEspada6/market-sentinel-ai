@@ -4,6 +4,22 @@ All notable changes to Market Sentinel AI will be documented in this file.
 
 The project follows semantic versioning once v1.0.0 is reached. Pre-1.0 releases map to the staged roadmap.
 
+## [2.0.0] - 2026-09-19
+
+### Added
+
+- Added a repository security gate for common leaked tokens, private keys, credential assignments
+  and required release documentation.
+- Added the `security-check` CLI command and CI security step.
+- Added a C7 end-to-end test covering scan, API, dry-run alert, paper persistence, drift, health
+  history and SQLite backup without network access or real credentials.
+- Added final release and security documentation for the non-executing v2.0.0 posture.
+
+### Changed
+
+- Promoted the package to the stable C7 `2.0.0` release.
+- Kept real execution disabled in every status, health and paper account response.
+
 ## [1.6.0] - 2026-09-19
 
 ### Added

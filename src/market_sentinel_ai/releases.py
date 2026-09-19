@@ -113,9 +113,12 @@ COMPLETION_PLAN: tuple[Release, ...] = (
     Release(
         code="C7",
         version="2.0.0",
-        title="Final Alerting And Paper Trading Release",
-        objective="Integrate, harden, package and document the complete non-executing application.",
+        title="Final Integrated Alerting And Paper Trading Release",
+        objective=(
+            "Integrate, harden, package and document the complete non-executing application "
+            "with repeatable security and end-to-end release gates."
+        ),
     ),
 )
 
-CURRENT_RELEASE = COMPLETION_PLAN[5]
+CURRENT_RELEASE = COMPLETION_PLAN[6]

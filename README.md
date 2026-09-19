@@ -2,7 +2,7 @@
 
 Market Sentinel AI is a predictive market analysis and alerting application. Its core loop is quantitative, cheap and deterministic: market data ingestion, feature engineering, supervised models, walk-forward backtesting, risk controls and alerting. GPT-6 Astra is reserved for contextual reasoning when a signal is important enough to justify the extra cost.
 
-Market Sentinel AI v1.6.0 is an alerting and paper-trading market analysis application under active completion. It includes deterministic demo data, replaceable Yahoo Finance, Stooq and Alpha Vantage market-data adapters, a public Binance order-book adapter, RSS/Atom news context, quality-gated SQLite ingestion, causal OHLCV/volatility features, causal multitimeframe alignment, trainable XGBoost and LightGBM models, purged walk-forward evaluation, cost-aware backtesting, persistent operational signals, a local API and dashboard, scheduled scans, dry-run/webhook alerts, order-flow features, regime-aware ensembles, gated and budget-audited GPT-6 Astra contextual reasoning, persistent paper accounts and trades, drift and health history, recovery backups and operational logs. It does not place live trades.
+Market Sentinel AI v2.0.0 is the final alerting and paper-trading market analysis application. It includes deterministic demo data, replaceable Yahoo Finance, Stooq and Alpha Vantage market-data adapters, a public Binance order-book adapter, RSS/Atom news context, quality-gated SQLite ingestion, causal OHLCV/volatility features, causal multitimeframe alignment, trainable XGBoost and LightGBM models, purged walk-forward evaluation, cost-aware backtesting, persistent operational signals, a local API and dashboard, scheduled scans, dry-run/webhook alerts, order-flow features, regime-aware ensembles, gated and budget-audited GPT-6 Astra contextual reasoning, persistent paper accounts and trades, drift and health history, recovery backups, operational logs, a repository security gate and end-to-end release tests. It does not place live trades.
 
 ## Safety Position
 
@@ -56,6 +56,7 @@ python -m market_sentinel_ai order-book-demo --provider demo --symbol BTCUSDT --
 python -m market_sentinel_ai astra-context-demo --symbol SPY --timeframe 5m --days 10
 python -m market_sentinel_ai news-demo --provider demo --symbol SPY
 python -m market_sentinel_ai health
+python -m market_sentinel_ai security-check
 python -m market_sentinel_ai backup --output backups/market_sentinel.sqlite3
 python -m market_sentinel_ai paper-demo --symbol SPY --timeframe 5m --days 10
 python -m market_sentinel_ai drift-demo --symbol SPY --timeframe 5m --days 20
@@ -98,6 +99,7 @@ modeling.
 Read [docs/news-context.md](docs/news-context.md) for RSS/Atom context and Astra budget rules.
 Read [docs/paper-operations.md](docs/paper-operations.md) for paper persistence and recovery.
 Read [docs/operations.md](docs/operations.md) for the v1 operating boundaries.
+Read [docs/final-release.md](docs/final-release.md) for the v2.0.0 release gate and [SECURITY.md](SECURITY.md) for secret handling.
 
 ## Why Astra Is Not the Continuous Predictor
 

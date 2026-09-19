@@ -47,6 +47,7 @@ from market_sentinel_ai.reasoning import (
 )
 from market_sentinel_ai.regime import Regime
 from market_sentinel_ai.releases import COMPLETION_PLAN, CURRENT_RELEASE, RELEASE_PLAN
+from market_sentinel_ai.security import run_security_checks
 from market_sentinel_ai.signals import SignalEngine
 from market_sentinel_ai.storage import SQLiteCandleRepository, sqlite_path_from_url
 
@@ -149,6 +150,8 @@ def main() -> None:
 
     subparsers.add_parser("health")
 
+    subparsers.add_parser("security-check")
+
     backup = subparsers.add_parser("backup")
     backup.add_argument("--output", default="backups/market_sentinel.sqlite3")
 
@@ -241,6 +244,9 @@ def main() -> None:
         return
     if command == "health":
         _health(settings)
+        return
+    if command == "security-check":
+        _security_check()
         return
     if command == "backup":
         _backup(settings, args.output)
@@ -855,6 +861,13 @@ def _drift_demo(settings: Settings, symbol: str, timeframe: Timeframe, days: int
 def _health(settings: Settings) -> None:
     repository = SQLiteCandleRepository(sqlite_path_from_url(settings.database_url))
     print(json.dumps(HealthService(repository).check().to_dict(), indent=2, sort_keys=True))
+
+
+def _security_check() -> None:
+    report = run_security_checks(Path.cwd())
+    print(json.dumps(report.to_dict(), indent=2, sort_keys=True))
+    if report.status != "ok":
+        raise SystemExit(1)
 
 
 def _backup(settings: Settings, output: str) -> None:

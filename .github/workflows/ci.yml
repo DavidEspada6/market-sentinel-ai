@@ -25,5 +25,8 @@ jobs:
       - name: Run tests
         run: python -m unittest discover -s tests
 
+      - name: Security gate
+        run: python -m market_sentinel_ai security-check
+
       - name: Build wheel
         run: python -m pip wheel . --no-deps --no-build-isolation --no-cache-dir --wheel-dir dist

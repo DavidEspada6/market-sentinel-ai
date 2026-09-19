@@ -1,8 +1,9 @@
 # Operations
 
-The original v1.0.0 is a prototype baseline. The completion track is active; v1.6.0 adds
-persistent paper state, drift history, health checks and database backup while preserving
-alert-only and paper-trading boundaries.
+The original v1.0.0 was a prototype baseline. The completion track ends at v2.0.0, which adds
+the integrated security gate and end-to-end release checks on top of persistent paper state,
+drift history, health checks and database backup while preserving alert-only and paper-trading
+boundaries.
 
 ## Supported Mode
 
@@ -31,8 +32,9 @@ alert-only and paper-trading boundaries.
 - Persistent Astra usage records and hard request, token and daily-cost budgets.
 - Persistent paper accounts and simulated trades with restart recovery.
 - SQLite integrity checks, health history and backup support.
+- Repository security check and final end-to-end release test.
 
-## Not Supported In v1
+## Not Supported In v2.0.0
 
 - Real-money order execution.
 - Broker account trading.
@@ -48,3 +50,4 @@ alert-only and paper-trading boundaries.
 - Review paper trading logs before any broker work.
 - Monitor drift before trusting stale models.
 - Keep Astra budget limits low until signal quality is proven.
+- Run `python -m market_sentinel_ai security-check` before publishing or deploying.

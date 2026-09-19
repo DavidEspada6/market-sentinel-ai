@@ -17,7 +17,19 @@ class CliSmokeTests(unittest.TestCase):
         )
 
         payload = json.loads(result.stdout)
-        self.assertEqual(payload["current_release"], "C6")
+        self.assertEqual(payload["current_release"], "C7")
+
+    def test_security_check_command_passes(self) -> None:
+        result = subprocess.run(
+            [sys.executable, "-m", "market_sentinel_ai", "security-check"],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["status"], "ok")
+        self.assertFalse(payload["real_orders_enabled"])
 
     def test_astra_context_demo_has_no_key_path(self) -> None:
         env = {**os.environ, "OPENAI_API_KEY": ""}

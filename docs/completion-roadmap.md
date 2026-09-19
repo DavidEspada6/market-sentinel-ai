@@ -12,8 +12,8 @@ reviewable releases and ends at v2.0.0.
 | C3 | 1.3.0 | Local API, operational dashboard, scheduling, persistent signals and alerts |
 | C4 | 1.4.0 | Real order-book data, aligned multi-timeframe features, regime-aware ensemble |
 | C5 | 1.5.0 | News context and audited GPT-6 Astra reasoning with hard cost limits |
-| C6 | 1.6.0 | Persistent paper portfolio, drift monitoring, health and recovery (current) |
-| C7 | 2.0.0 | Integrated packaging, security checks, end-to-end tests and final documentation |
+| C6 | 1.6.0 | Persistent paper portfolio, drift monitoring, health and recovery |
+| C7 | 2.0.0 | Integrated packaging, security checks, end-to-end tests and final documentation (current) |
 
 Every release must pass lint and tests, update documentation and changelog, and be published as
 a clean commit, semantic tag and GitHub Release. Real-money execution remains outside this plan.

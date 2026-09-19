@@ -1,6 +1,6 @@
 [project]
 name = "market-sentinel-ai"
-version = "1.6.0"
+version = "2.0.0"
 description = "Predictive market analysis and alerting system with a quantitative core and GPT-6 Astra as contextual reasoning layer."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -10,7 +10,7 @@ authors = [
 ]
 keywords = ["trading", "market-analysis", "backtesting", "alerts", "openai", "gpt-6-astra"]
 classifiers = [
-  "Development Status :: 3 - Alpha",
+  "Development Status :: 5 - Production/Stable",
   "Intended Audience :: Financial and Insurance Industry",
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3.11",
