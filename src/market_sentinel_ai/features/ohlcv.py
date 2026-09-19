@@ -37,6 +37,7 @@ class OHLCVFeatureEngine:
         losses: list[float] = []
         fast_ema: float | None = None
         slow_ema: float | None = None
+        previous_ema_cross_bps: float | None = None
         fast_alpha = 2 / (self.fast_ema_window + 1)
         slow_alpha = 2 / (self.rolling_window + 1)
 
@@ -85,6 +86,17 @@ class OHLCVFeatureEngine:
             volume_std = pstdev(rolling_volumes) if len(rolling_volumes) > 1 else 0.0
             reference_3 = closes[max(0, index - 3)]
             reference_5 = closes[max(0, index - 5)]
+            reference_6 = closes[max(0, index - 6)]
+            reference_12 = closes[max(0, index - 12)]
+            rolling_mean = mean(rolling_closes)
+            rolling_std = pstdev(rolling_closes) if len(rolling_closes) > 1 else 0.0
+            bollinger_width_bps = (2 * rolling_std / rolling_mean) * 10_000 if rolling_mean else 0.0
+            candle_range = max(candle.high - candle.low, 1e-12)
+            ema_cross_bps = ((fast_ema - slow_ema) / slow_ema) * 10_000
+            ema_cross_slope_bps = ema_cross_bps - (
+                previous_ema_cross_bps if previous_ema_cross_bps is not None else ema_cross_bps
+            )
+            previous_ema_cross_bps = ema_cross_bps
             minute_of_day = candle.opened_at.hour * 60 + candle.opened_at.minute
             time_angle = (minute_of_day / 1440) * 2 * math.pi
             weekday_angle = (candle.opened_at.weekday() / 7) * 2 * math.pi
@@ -105,11 +117,21 @@ class OHLCVFeatureEngine:
                         else 0.0,
                         "return_3_bps": ((candle.close - reference_3) / reference_3) * 10_000,
                         "return_5_bps": ((candle.close - reference_5) / reference_5) * 10_000,
+                        "return_6_bps": ((candle.close - reference_6) / reference_6) * 10_000,
+                        "return_12_bps": ((candle.close - reference_12) / reference_12) * 10_000,
                         "atr_bps": mean(true_ranges_bps[-self.rolling_window :]),
                         "rsi": rsi,
                         "ema_fast_distance_bps": ((candle.close - fast_ema) / fast_ema) * 10_000,
                         "ema_slow_distance_bps": ((candle.close - slow_ema) / slow_ema) * 10_000,
-                        "ema_cross_bps": ((fast_ema - slow_ema) / slow_ema) * 10_000,
+                        "ema_cross_bps": ema_cross_bps,
+                        "ema_cross_slope_bps": ema_cross_slope_bps,
+                        "bollinger_position": (
+                            (candle.close - (rolling_mean - 2 * rolling_std))
+                            / max(4 * rolling_std, 1e-12)
+                        ),
+                        "bollinger_width_bps": bollinger_width_bps,
+                        "close_location": (candle.close - candle.low) / candle_range,
+                        "body_to_range": abs(candle.close - candle.open) / candle_range,
                         "distance_to_high_bps": (
                             (candle.close - max(rolling_closes)) / max(rolling_closes)
                         )

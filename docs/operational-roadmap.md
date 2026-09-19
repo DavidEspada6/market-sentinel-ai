@@ -11,17 +11,19 @@ releases make it a practical daily analysis tool while keeping paper trading as 
 | O4 | 2.4.0 | Complete | Estimated/realized PnL, VaR, CVaR, exposure, drawdown and calibration |
 | O5 | 2.5.0 | Complete | Production operations, notifications, data quality and continuous observability |
 | O6 | 2.6.0 | Complete | Interactive color dashboard, chart windows, future scenarios and visual risk levels |
-| O7 | 2.7.4 | Current | Complete UI control center for scanning, paper metrics and diagnostics |
-| O8 | 3.0.0 | Optional | Broker integration only after explicit approval and a separate security review |
+| O7 | 2.7.4 | Complete | Complete UI control center for scanning, paper metrics and diagnostics |
+| O8 | 2.8.0 | Current | Adaptive supervised predictions, cost-aware labels and visible walk-forward diagnostics |
+| O9 | 3.0.0 | Optional | Broker integration only after explicit approval and a separate security review |
 
 ## What "operational" means
 
-At O7 the app continuously scans configured instruments, persists every decision, alerts on new
-actionable changes, shows paper performance and risk metrics, and exposes scanning, diagnostics,
-paper history and context usage directly in the visual workspace. It still does not submit real
-orders.
+At O8 the app continuously scans configured instruments, persists every decision, retrains a
+local supervised directional model when enough provider history exists, exposes its out-of-sample
+metrics, alerts on new actionable changes, shows paper performance and risk metrics, and exposes
+scanning, diagnostics, paper history and context usage directly in the visual workspace. It still
+does not submit real orders.
 
-O8 is not required for a useful operational application. It is deliberately separate because
+O9 is not required for a useful operational application. It is deliberately separate because
 real execution adds authentication, broker-specific behavior, reconciliation, order state,
 manual approval and incident-response requirements that should not be mixed into the analysis
 track.

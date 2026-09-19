@@ -187,6 +187,15 @@ FOLLOW_ON_PLAN: tuple[Release, ...] = (
     ),
     Release(
         code="O8",
+        version="2.8.0",
+        title="Adaptive Supervised Prediction Loop",
+        objective=(
+            "Train a cost-aware local directional model from real candle history, expose its "
+            "walk-forward metrics and fall back visibly when data is insufficient."
+        ),
+    ),
+    Release(
+        code="O9",
         version="3.0.0",
         title="Optional Broker Integration Review",
         objective=(
@@ -196,4 +205,4 @@ FOLLOW_ON_PLAN: tuple[Release, ...] = (
     ),
 )
 
-CURRENT_RELEASE = FOLLOW_ON_PLAN[6]
+CURRENT_RELEASE = FOLLOW_ON_PLAN[7]

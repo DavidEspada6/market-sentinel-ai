@@ -25,8 +25,6 @@ from market_sentinel_ai.domain.instruments import (
     search_instruments,
 )
 from market_sentinel_ai.domain.market import Timeframe
-from market_sentinel_ai.features import OHLCVFeatureEngine
-from market_sentinel_ai.models import MomentumBaselineModel
 from market_sentinel_ai.monitoring import HealthService
 from market_sentinel_ai.operations import MarketScanService, MarketScheduler
 from market_sentinel_ai.reasoning import AstraUsageLedger
@@ -126,6 +124,10 @@ def create_app(
             "alert_dedupe_minutes": active_settings.alerts.dedupe_minutes,
             "real_orders_enabled": False,
         }
+
+    @app.get("/api/v1/model-status")
+    def model_status() -> list[dict[str, object]]:
+        return [dict(item) for item in active_service.model_status()]
 
     @app.get("/api/v1/instruments")
     def instruments(
@@ -227,19 +229,45 @@ def create_app(
                 ),
             )
 
-        features = OHLCVFeatureEngine().transform(candles)
-        horizon_minutes = {
-            Timeframe.ONE_MINUTE: 1,
-            Timeframe.FIVE_MINUTES: 5,
-            Timeframe.FIFTEEN_MINUTES: 15,
-            Timeframe.ONE_HOUR: 60,
-            Timeframe.ONE_DAY: 1440,
-        }[spec.timeframe]
-        prediction = MomentumBaselineModel(horizon_minutes=horizon_minutes).predict(features)
+        analysis_candles = candles
+        if len(candles) < 123:
+            training_days = {
+                Timeframe.ONE_MINUTE: 5,
+                Timeframe.FIVE_MINUTES: 5,
+                Timeframe.FIFTEEN_MINUTES: 30,
+                Timeframe.ONE_HOUR: 30,
+                Timeframe.ONE_DAY: 365,
+            }[spec.timeframe]
+            try:
+                training_candles = sorted(
+                    list(
+                        active_service.provider.historical_candles(
+                            market_symbol,
+                            spec.timeframe,
+                            end - timedelta(days=training_days),
+                            end,
+                        )
+                    ),
+                    key=lambda candle: candle.opened_at,
+                )
+                if (
+                    len(training_candles) >= 123
+                    and training_candles[-1].opened_at >= candles[-1].opened_at
+                ):
+                    analysis_candles = training_candles
+                    repository.upsert_many(training_candles)
+            except (MarketDataProviderError, OSError, ValueError):
+                pass
+
         round_trip_cost_bps = (
             active_settings.risk.default_fee_bps * 2
             + active_settings.risk.default_slippage_bps * 2
             + active_settings.risk.default_spread_bps
+        )
+        prediction, features = active_service.predict_market(
+            analysis_candles,
+            spec.timeframe,
+            round_trip_cost_bps,
         )
         signal = SignalEngine(
             min_probability=0.55,

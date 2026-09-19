@@ -34,7 +34,9 @@ externamente tienen prioridad sobre `.env`.
   confianza, entrada, objetivo y stop.
 - El panel de paper trading muestra PnL estimado/realizado/total, VaR, CVaR, Sharpe, Sortino,
   drawdown, profit factor, win rate, expectancy, exposicion y operaciones simuladas.
-- El panel de salud muestra estado del servicio, drift, uso de Astra y la ultima ejecucion.
+- El panel de salud muestra estado del servicio, modelo cuantitativo, drift, uso de Astra y la
+  ultima ejecucion. El modelo adaptativo se vuelve a entrenar al detectar una vela nueva durante
+  un escaneo; con poco historial se indica `Baseline de respaldo`.
 - La dirección central es la lectura del modelo para el horizonte elegido. La banda futura superior
   e inferior es un rango aproximado calculado con ATR y momentum, no una segunda predicción
   contraria. No es una prediccion garantizada, asesoramiento financiero ni una orden automatica.

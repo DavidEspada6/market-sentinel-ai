@@ -30,9 +30,11 @@ def build_directional_examples(
     feature_rows = feature_engine.transform(candles)
     examples: list[TrainingExample] = []
     for index in range(0, len(candles) - horizon_candles):
-        entry_candle = candles[index + 1]
+        entry_candle = candles[index]
         exit_candle = candles[index + horizon_candles]
-        realized_return_bps = ((exit_candle.close - entry_candle.open) / entry_candle.open) * 10_000
+        realized_return_bps = (
+            (exit_candle.close - entry_candle.close) / entry_candle.close
+        ) * 10_000
         if abs(realized_return_bps) < min_abs_return_bps:
             continue
 

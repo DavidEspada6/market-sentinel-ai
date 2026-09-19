@@ -4,6 +4,25 @@ All notable changes to Market Sentinel AI will be documented in this file.
 
 The project follows semantic versioning once v1.0.0 is reached. Pre-1.0 releases map to the staged roadmap.
 
+## [2.8.0] - 2026-09-19
+
+### Added
+
+- Added an adaptive local supervised classifier for the operational scan and chart APIs.
+- Added cost-aware three-way labels (LONG, SHORT and NO_TRADE) based on future candle closes.
+- Added causal technical features for multi-horizon returns, EMA slope, Bollinger position,
+  candle location and body/range structure.
+- Added purged walk-forward accuracy, precision, coverage and net-PnL metadata to trained signals.
+- Added `/api/v1/model-status` and a visible model-training panel in the UI.
+
+### Changed
+
+- Operational scans use the adaptive model when enough provider history exists and visibly fall
+  back to the momentum baseline when it does not.
+- Fixed the legacy directional dataset so its return label starts at the feature candle close and
+  ends at a later close.
+- Kept all predictions advisory, paper-only and disabled for real-money execution.
+
 ## [2.7.4] - 2026-09-19
 
 ### Added

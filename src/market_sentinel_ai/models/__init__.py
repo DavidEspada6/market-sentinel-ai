@@ -10,10 +10,11 @@ from market_sentinel_ai.models.ensemble import (
     WeightedEnsembleModel,
     WeightedModel,
 )
-from market_sentinel_ai.models.supervised import LogisticDirectionalModel
+from market_sentinel_ai.models.supervised import AdaptiveDirectionalModel, LogisticDirectionalModel
 
 __all__ = [
     "LightGBMDirectionalModel",
+    "AdaptiveDirectionalModel",
     "LogisticDirectionalModel",
     "MomentumBaselineModel",
     "RegimeAwareEnsembleModel",

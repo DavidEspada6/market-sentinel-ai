@@ -150,6 +150,7 @@ def build_market_chart_payload(
             "horizon_minutes": signal.prediction.horizon_minutes,
             "model": signal.prediction.model_name,
             "rationale": signal.rationale,
+            "metadata": signal.prediction.metadata,
         },
         "levels": {
             "entry": plan.entry_price,
@@ -209,7 +210,7 @@ def _build_forecast(
     center: list[dict[str, object]] = []
     for step in range(1, steps + 1):
         progress = min(1.0, step / horizon_steps)
-        expected_move = direction_sign * expected_bps * progress / 10_000
+        expected_move = direction_sign * abs(expected_bps) * progress / 10_000
         central_price = close * (1 + expected_move)
         spread = close * atr_bps / 10_000 * sqrt(progress)
         timestamp = latest.opened_at + timedelta(minutes=step_minutes * step)
@@ -219,7 +220,7 @@ def _build_forecast(
         lower.append({"time": iso_timestamp, "value": max(0.000001, central_price - spread)})
 
     return {
-        "method": "ATR envelope + momentum-baseline scenario",
+        "method": f"ATR envelope + {signal.prediction.model_name} scenario",
         "upper": upper,
         "center": center,
         "lower": lower,

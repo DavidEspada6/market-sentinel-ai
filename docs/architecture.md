@@ -98,6 +98,12 @@ Risk-aware signal generation
         +--> Paper trading ledger
 ```
 
+The operational prediction path first tries the adaptive local supervised model. Its examples
+are built from past candle features and later closing prices, then evaluated with a purged
+walk-forward report. A scan uses the latest fitted model only when it has enough provider
+history; otherwise it records a `momentum-baseline` fallback and the reason in model status.
+No model in this path can place a live order.
+
 ## Anti-Leakage Rules
 
 - Features at time `t` may only use information available at or before `t`.

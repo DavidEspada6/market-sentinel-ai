@@ -486,6 +486,7 @@ def render_operational_dashboard(
       <h2>Salud, drift y contexto</h2>
       <div class="diagnostic-grid">
         <div class="diagnostic-item"><span>Salud de la aplicacion</span><strong id="health-status">Cargando</strong><small id="health-detail">-</small></div>
+        <div class="diagnostic-item"><span>Modelo cuantitativo</span><strong id="model-status">Cargando</strong><small id="model-detail">-</small></div>
         <div class="diagnostic-item"><span>Drift de modelo</span><strong id="drift-status">Cargando</strong><small id="drift-detail">-</small></div>
         <div class="diagnostic-item"><span>Uso de Astra</span><strong id="astra-usage">Cargando</strong><small id="astra-cost">-</small></div>
         <div class="diagnostic-item"><span>Ultima ejecucion</span><strong id="run-status">Cargando</strong><small id="run-detail">-</small></div>
@@ -557,11 +558,12 @@ def render_operational_dashboard(
     }}
 
     async function loadOperationalData() {{
-      const [statusData, summaryData, accountData, metricsData, healthData, driftData, astraData, tradesData] =
+      const [statusData, summaryData, accountData, metricsData, healthData, modelData, driftData, astraData, tradesData] =
         await Promise.all([
           fetchJson('/api/v1/status'), fetchJson('/api/v1/operations/summary'),
           fetchJson('/api/v1/paper/account'), fetchJson('/api/v1/paper/metrics'),
-          fetchJson('/api/v1/health/details'), fetchJson('/api/v1/drift?limit=1'),
+          fetchJson('/api/v1/health/details'), fetchJson('/api/v1/model-status'),
+          fetchJson('/api/v1/drift?limit=1'),
           fetchJson('/api/v1/astra-usage'), fetchJson('/api/v1/paper/trades?limit=50')
         ]);
       if (statusData) {{
@@ -601,6 +603,15 @@ def render_operational_dashboard(
         safeText(driftData[0].status || 'Registrado') : 'Sin informes';
       document.getElementById('drift-detail').textContent = driftData && driftData.length ?
         safeText(driftData[0].created_at || driftData[0].timestamp) : 'Aun no hay drift persistido';
+      const latestModel = modelData && modelData.length ? modelData[modelData.length - 1] : null;
+      document.getElementById('model-status').textContent = latestModel ?
+        (latestModel.status === 'trained' ? safeText(latestModel.model) : 'Baseline de respaldo') :
+        'Se entrena al escanear';
+      document.getElementById('model-detail').textContent = latestModel ?
+        (latestModel.status === 'trained' ?
+          `${{latestModel.training_samples || 0}} muestras · prec. ${{((latestModel.oos_precision || 0) * 100).toFixed(1)}}% · recall ${{((latestModel.oos_recall || 0) * 100).toFixed(1)}}% · cobertura ${{((latestModel.oos_coverage || 0) * 100).toFixed(1)}}%` :
+          safeText(latestModel.reason || 'Aun no hay suficientes velas')) :
+        'Necesita historial suficiente y solo usa datos cerrados';
       if (astraData) {{
         document.getElementById('astra-usage').textContent = `${{astraData.requests}} / ${{astraData.max_requests_per_day}} solicitudes`;
         document.getElementById('astra-cost').textContent = `Coste estimado $${{Number(astraData.estimated_cost_usd || 0).toFixed(4)}}`;
@@ -761,7 +772,7 @@ def render_operational_dashboard(
       lastChartPayload = payload;
       marketTitle.textContent = `${{payload.symbol}} · ${{payload.name}}`;
       marketMeta.textContent = `${{payload.window_label}} · ${{payload.candle_count}} velas · ` +
-        `${{payload.timeframe}} · ${{payload.currency}}`;
+        `${{payload.timeframe}} · ${{payload.currency}} · modelo ${{payload.signal.model}}`;
       const direction = payload.signal.direction;
       const directionClass = direction === 'LONG' ? 'long' : direction === 'SHORT' ? 'short' : 'wait';
       const directionLabel = direction === 'LONG' ? 'SEÑAL ALCISTA' :

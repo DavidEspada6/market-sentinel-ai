@@ -102,6 +102,9 @@ class O6MarketUITests(unittest.TestCase):
             self.assertIn(payload["forecast"]["direction"], {"LONG", "SHORT", "NO_TRADE"})
             self.assertIn("entry", payload["levels"])
             self.assertIn("aproximado", payload["disclaimer"])
+            model_status = client.get("/api/v1/model-status")
+            self.assertEqual(model_status.status_code, 200)
+            self.assertTrue(model_status.json())
 
             invalid = client.get("/api/v1/market/SPY", params={"window": "90d"})
             self.assertEqual(invalid.status_code, 422)
@@ -125,6 +128,7 @@ class O6MarketUITests(unittest.TestCase):
             self.assertIn('id="scan-periodic"', html)
             self.assertIn('id="paper-metrics"', html)
             self.assertIn('id="health-status"', html)
+            self.assertIn('id="model-status"', html)
             self.assertIn('id="market-decision"', html)
             self.assertIn('id="forecast-label"', html)
             self.assertIn('data-chart-mode="candles"', html)

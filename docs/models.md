@@ -4,6 +4,26 @@ The quantitative loop uses a model only after features have been computed from c
 at the prediction timestamp. The baseline momentum model and dependency-free logistic model run
 in the base installation. C2 adds XGBoost and LightGBM behind the `ml` extra.
 
+## Operational Adaptive Model
+
+The live scan and chart endpoints use `AdaptiveDirectionalModel` when the selected provider has
+at least 120 labelled candles. It is a local multinomial logistic classifier with standardised
+causal OHLCV features: multi-horizon returns, EMA distance and slope, RSI, ATR, Bollinger
+position/width, volume z-score and candle geometry. It retrains when the latest candle or the
+cost configuration changes, so a periodic scan gradually incorporates newly closed candles.
+
+Labels are deliberately cost-aware and have three outcomes: `LONG` when the forward close
+exceeds the configured round-trip cost threshold, `SHORT` when it falls below the negative
+threshold, and `NO_TRADE` otherwise. The latest candle is predicted without a label, so its
+future close is never used as an input. If history is too short, classes are insufficient or the
+optional ML dependencies are missing, the application reports a visible `momentum-baseline`
+fallback instead of pretending that the adaptive model was trained.
+
+Every trained signal carries its sample count, label threshold, walk-forward folds, directional
+accuracy, precision, recall, coverage and net PnL in metadata. The UI exposes the same information in
+the quantitative model panel and `/api/v1/model-status`. These are monitoring metrics, not a
+promise of future profitability.
+
 ## Training
 
 `build_directional_examples` creates one row per decision timestamp and shifts the label forward
