@@ -11,7 +11,7 @@ releases make it a practical daily analysis tool while keeping paper trading as 
 | O4 | 2.4.0 | Complete | Estimated/realized PnL, VaR, CVaR, exposure, drawdown and calibration |
 | O5 | 2.5.0 | Complete | Production operations, notifications, data quality and continuous observability |
 | O6 | 2.6.0 | Complete | Interactive color dashboard, chart windows, future scenarios and visual risk levels |
-| O7 | 2.7.1 | Current | Complete UI control center for scanning, paper metrics and diagnostics |
+| O7 | 2.7.2 | Current | Complete UI control center for scanning, paper metrics and diagnostics |
 | O8 | 3.0.0 | Optional | Broker integration only after explicit approval and a separate security review |
 
 ## What "operational" means

@@ -1,6 +1,6 @@
 [project]
 name = "market-sentinel-ai"
-version = "2.7.1"
+version = "2.7.2"
 description = "Predictive market analysis and alerting system with a quantitative core and GPT-6 Astra as contextual reasoning layer."
 readme = "README.md"
 requires-python = ">=3.11"

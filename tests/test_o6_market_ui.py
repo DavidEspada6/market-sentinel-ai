@@ -92,6 +92,7 @@ class O6MarketUITests(unittest.TestCase):
             self.assertEqual(payload["source"], "provider")
             self.assertGreater(payload["candle_count"], 2)
             self.assertEqual(len(payload["forecast"]["upper"]), 6)
+            self.assertIn(payload["forecast"]["direction"], {"LONG", "SHORT", "NO_TRADE"})
             self.assertIn("entry", payload["levels"])
             self.assertIn("aproximado", payload["disclaimer"])
 
@@ -117,6 +118,8 @@ class O6MarketUITests(unittest.TestCase):
             self.assertIn('id="scan-periodic"', html)
             self.assertIn('id="paper-metrics"', html)
             self.assertIn('id="health-status"', html)
+            self.assertIn('id="market-decision"', html)
+            self.assertIn('id="forecast-label"', html)
 
 
 if __name__ == "__main__":

@@ -303,6 +303,7 @@ def render_operational_dashboard(
     .pill.long {{ background: #e1f4e8; color: var(--green); }}
     .pill.short {{ background: #fde8e7; color: var(--red); }}
     .pill.wait {{ background: #eef1f3; color: var(--muted); }}
+    .pill.demo {{ background: #fff8e6; color: #72520f; }}
     .window-buttons {{ display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }}
     .window-button {{ background: #edf3f4; color: var(--ink); border: 1px solid transparent;
       padding: 7px 9px; font-size: 12px; }}
@@ -322,6 +323,10 @@ def render_operational_dashboard(
     .legend-item.target::before {{ background: var(--green); }}
     .legend-item.stop::before {{ background: var(--red); }}
     .forecast-note {{ color: var(--muted); font-size: 12px; margin-top: 10px; }}
+    .decision-note {{ border-left: 4px solid var(--amber); background: #fff8e6; color: #72520f;
+      padding: 10px 12px; margin-bottom: 12px; font-size: 13px; font-weight: 600; }}
+    .decision-note.long {{ border-left-color: var(--green); background: #e1f4e8; color: #166534; }}
+    .decision-note.short {{ border-left-color: var(--red); background: #fde8e7; color: #991b1b; }}
     .market-empty {{ color: var(--muted); padding: 70px 16px; text-align: center; }}
     @media (max-width: 760px) {{ header {{ align-items: flex-start; flex-direction: column; }}
       main {{ padding: 14px; }} .summary {{ grid-template-columns: 1fr; }}
@@ -422,10 +427,13 @@ def render_operational_dashboard(
         <div class="chart-stat"><span>Entrada</span><strong>-</strong></div>
         <div class="chart-stat"><span>Objetivo / stop</span><strong>-</strong></div>
       </div>
+      <div class="decision-note" id="market-decision" aria-live="polite">
+        Selecciona un activo para obtener una lectura direccional.
+      </div>
       <div class="chart-wrap"><canvas id="market-chart" height="340" aria-label="Gráfico de mercado"></canvas>
         <div class="market-empty" id="market-empty">No hay un activo seleccionado.</div></div>
       <div class="chart-legend"><span class="legend-item">Histórico</span>
-        <span class="legend-item forecast">Escenario futuro aprox.</span>
+        <span class="legend-item forecast" id="forecast-label">Rango futuro aprox.</span>
         <span class="legend-item target">Objetivo</span><span class="legend-item stop">Stop</span></div>
       <div class="forecast-note" id="market-disclaimer">Las líneas futuras aparecerán al seleccionar un activo.</div>
     </div></section>
@@ -495,6 +503,8 @@ def render_operational_dashboard(
     const marketCanvas = document.getElementById('market-chart');
     const marketEmpty = document.getElementById('market-empty');
     const marketDisclaimer = document.getElementById('market-disclaimer');
+    const marketDecision = document.getElementById('market-decision');
+    const forecastLabel = document.getElementById('forecast-label');
     const defaultSymbol = "{escape(default_symbol)}";
     let selectedSymbol = defaultSymbol;
     let selectedWindow = '1d';
@@ -674,7 +684,10 @@ def render_operational_dashboard(
           ctx.lineTo(xx, y(item.value)); }}); ctx.closePath(); ctx.fill();
         line(upper, '#b7791f', true, historical.length - 1);
         line(lower, '#b7791f', true, historical.length - 1);
-        line(future, '#b7791f', true, historical.length - 1);
+        const direction = payload.signal && payload.signal.direction;
+        const centerColor = direction === 'LONG' ? '#16803c' :
+          direction === 'SHORT' ? '#b42318' : '#b7791f';
+        line(future, centerColor, true, historical.length - 1);
       }}
       const horizontal = (value, color, label) => {{
         if (typeof value !== 'number') return;
@@ -707,10 +720,24 @@ def render_operational_dashboard(
       marketTitle.textContent = `${{payload.symbol}} · ${{payload.name}}`;
       marketMeta.textContent = `${{payload.window_label}} · ${{payload.candle_count}} velas · ` +
         `${{payload.timeframe}} · ${{payload.currency}}`;
-      marketAction.textContent = payload.signal.action;
-      marketAction.className = 'pill ' + (payload.signal.direction === 'LONG' ? 'long' :
-        payload.signal.direction === 'SHORT' ? 'short' : 'wait');
-      marketSource.textContent = `${{payload.source === 'provider' ? 'Proveedor' : 'Caché local'}} · ${{payload.provider}}`;
+      const direction = payload.signal.direction;
+      const directionClass = direction === 'LONG' ? 'long' : direction === 'SHORT' ? 'short' : 'wait';
+      const directionLabel = direction === 'LONG' ? 'SEÑAL ALCISTA' :
+        direction === 'SHORT' ? 'SEÑAL BAJISTA' : 'ESPERAR';
+      marketAction.textContent = directionLabel;
+      marketAction.className = 'pill ' + directionClass;
+      marketDecision.className = 'decision-note ' + directionClass;
+      marketDecision.textContent = direction === 'LONG' ?
+        'Lectura actual: ALCISTA. El modelo ve un sesgo de subida para este horizonte; revisa entrada, objetivo y stop antes de cualquier operación paper.' :
+        direction === 'SHORT' ?
+        'Lectura actual: BAJISTA. El modelo ve un sesgo de bajada para este horizonte; revisa entrada, objetivo y stop antes de cualquier operación paper.' :
+        'Lectura actual: INDEFINIDA. No hay señal clara de compra o venta; la zona amarilla es solo un rango de incertidumbre.';
+      forecastLabel.textContent = direction === 'NO_TRADE' ?
+        'Rango de incertidumbre (sin dirección)' : 'Rango futuro aprox.';
+      const sourceIsDemo = payload.provider === 'demo';
+      marketSource.textContent = sourceIsDemo ? 'DATOS DEMO' :
+        `${{payload.source === 'provider' ? 'Proveedor' : 'Caché local'}} · ${{payload.provider}}`;
+      marketSource.className = 'pill ' + (sourceIsDemo ? 'demo' : '');
       setSummary(payload); marketDisclaimer.textContent = payload.disclaimer;
       marketCanvas.style.display = 'block'; marketEmpty.style.display = 'none'; drawMarketChart(payload);
     }}

@@ -162,8 +162,17 @@ def build_market_chart_payload(
         },
         "forecast": forecast,
         "disclaimer": (
-            "Las líneas futuras son un escenario aproximado basado en volatilidad y momentum; "
-            "no son una garantía ni una orden de inversión."
+            (
+                "ESPERAR: no hay una dirección suficientemente clara para comprar o vender. "
+                "La zona amarilla es un rango de incertidumbre basado en volatilidad y momentum."
+                if signal.prediction.direction.value == "NO_TRADE"
+                else (
+                    f"Señal {signal.prediction.direction.value}: el modelo estima un sesgo "
+                    "direccional, pero la banda amarilla muestra la incertidumbre del escenario "
+                    "futuro aproximado."
+                )
+            )
+            + " No es una garantía ni una orden de inversión."
         ),
     }
 
@@ -214,6 +223,7 @@ def _build_forecast(
         "upper": upper,
         "center": center,
         "lower": lower,
+        "direction": direction.value,
         "horizon_minutes": signal.prediction.horizon_minutes,
         "atr_bps": atr_bps,
         "entry": plan.entry_price,

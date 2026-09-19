@@ -4,6 +4,15 @@ All notable changes to Market Sentinel AI will be documented in this file.
 
 The project follows semantic versioning once v1.0.0 is reached. Pre-1.0 releases map to the staged roadmap.
 
+## [2.7.2] - 2026-09-19
+
+### Changed
+
+- Added an explicit `SEÑAL ALCISTA`, `SEÑAL BAJISTA` or `ESPERAR` decision to the chart panel.
+- Explained that the yellow future band is an uncertainty range, not a direction by itself.
+- Highlighted `DATOS DEMO` so synthetic data cannot be mistaken for live market data.
+- Colored the central future scenario green, red or amber according to the direction state.
+
 ## [2.7.1] - 2026-09-19
 
 ### Fixed
