@@ -18,6 +18,7 @@ The default binding is local-only. The service does not place real orders.
   \`limit\`.
 - \`GET /api/v1/alerts\` lists persisted alert deliveries.
 - GET /api/v1/runs lists scheduler runs.
+- GET /api/v1/operations/summary returns watchlist, signal, alert, scheduler and health counts.
 - GET /api/v1/instruments searches the curated instrument universe with optional \`q\`,
   \`asset_class\`, \`limit\` and \`source\` filters. Source can be \`local\`, \`provider\` or
   \`auto\`.

@@ -104,6 +104,22 @@ def create_app(
     def runs(limit: int = Query(default=20, ge=1, le=200)) -> list[dict[str, object]]:
         return [run.to_dict() for run in repository.list_scheduler_runs(limit)]
 
+    @app.get("/api/v1/operations/summary")
+    def operations_summary() -> dict[str, object]:
+        runs = repository.list_scheduler_runs(limit=1)
+        health = repository.list_health_checks(limit=1)
+        return {
+            "release": CURRENT_RELEASE.code,
+            "version": CURRENT_RELEASE.version,
+            "watchlist_count": len(repository.list_watchlist()),
+            "signal_count": len(repository.list_signals(limit=500)),
+            "alert_count": len(repository.list_alerts(limit=500)),
+            "last_scheduler_run": runs[0].to_dict() if runs else None,
+            "last_health_check": health[0] if health else None,
+            "alert_dedupe_minutes": active_settings.alerts.dedupe_minutes,
+            "real_orders_enabled": False,
+        }
+
     @app.get("/api/v1/instruments")
     def instruments(
         q: str = "",

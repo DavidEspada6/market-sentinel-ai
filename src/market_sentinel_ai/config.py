@@ -78,6 +78,7 @@ class OrderBookSettings:
 @dataclass(frozen=True)
 class AlertSettings:
     dry_run: bool
+    dedupe_minutes: int
     email_from: str
     email_to: str
     webhook_url: str
@@ -147,6 +148,7 @@ class Settings:
             ),
             alerts=AlertSettings(
                 dry_run=_env_bool("ALERTS_DRY_RUN", True),
+                dedupe_minutes=_env_int("ALERT_DEDUPE_MINUTES", 30),
                 email_from=_env_str("ALERT_EMAIL_FROM", ""),
                 email_to=_env_str("ALERT_EMAIL_TO", ""),
                 webhook_url=_env_str("ALERT_WEBHOOK_URL", ""),

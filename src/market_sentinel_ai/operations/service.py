@@ -87,7 +87,11 @@ class MarketScanService:
 
         alerts: list[AlertRecord] = []
         if signal.is_actionable:
-            alerts.append(self._send_alert(record, signal))
+            alerts.append(
+                self._send_alert(record, signal)
+                if not self._is_duplicate_actionable_signal(record)
+                else self._suppress_alert(record)
+            )
 
         return ScanResult(
             signal=record,
@@ -118,6 +122,37 @@ class MarketScanService:
                 created_at=created_at,
                 error=str(exc),
             )
+        self.repository.record_alert(alert)
+        return alert
+
+    def _is_duplicate_actionable_signal(self, record: SignalRecord) -> bool:
+        if self.settings.alerts.dedupe_minutes <= 0:
+            return False
+        recent = self.repository.list_signals(
+            symbol=record.symbol,
+            timeframe=record.timeframe,
+            limit=2,
+        )
+        if len(recent) < 2:
+            return False
+        previous = recent[1]
+        age_seconds = (record.created_at - previous.created_at).total_seconds()
+        return (
+            0 <= age_seconds <= self.settings.alerts.dedupe_minutes * 60
+            and previous.direction == record.direction
+            and previous.metadata.get("plan_action") == record.metadata.get("plan_action")
+        )
+
+    def _suppress_alert(self, record: SignalRecord) -> AlertRecord:
+        alert = AlertRecord(
+            alert_id=str(uuid4()),
+            signal_id=record.signal_id,
+            channel=self.alert_channel.channel_name,
+            status="suppressed",
+            external_id=None,
+            created_at=datetime.now(tz=UTC),
+            error="duplicate actionable signal inside alert dedupe window",
+        )
         self.repository.record_alert(alert)
         return alert
 

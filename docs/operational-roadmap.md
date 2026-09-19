@@ -8,8 +8,8 @@ releases make it a practical daily analysis tool while keeping paper trading as 
 | O1 | 2.1.0 | Complete | Curated universe, persistent watchlist and periodic multi-symbol scans |
 | O2 | 2.2.0 | Complete | Provider-backed symbol search, metadata and richer watchlist UX |
 | O3 | 2.3.0 | Complete | Entry zones, invalidation, take-profit and exit signal lifecycle |
-| O4 | 2.4.0 | Current | Estimated/realized PnL, VaR, CVaR, exposure, drawdown and calibration |
-| O5 | 2.5.0 | Planned | Production operations, notifications, data quality and continuous observability |
+| O4 | 2.4.0 | Complete | Estimated/realized PnL, VaR, CVaR, exposure, drawdown and calibration |
+| O5 | 2.5.0 | Current | Production operations, notifications, data quality and continuous observability |
 | O6 | 3.0.0 | Optional | Broker integration only after explicit approval and a separate security review |
 
 ## What "operational" means

@@ -4,6 +4,19 @@ All notable changes to Market Sentinel AI will be documented in this file.
 
 The project follows semantic versioning once v1.0.0 is reached. Pre-1.0 releases map to the staged roadmap.
 
+## [2.5.0] - 2026-09-19
+
+### Added
+
+- Added configurable actionable-alert deduplication with persisted `suppressed` alert records.
+- Added an operations summary endpoint with watchlist, signal, alert, scheduler and health state.
+- Added the continuous watchlist operations test and documented the O5 operating posture.
+
+### Changed
+
+- Promoted the operational product track to O5 `2.5.0`.
+- Kept notification channels separate from broker execution; no real orders are supported.
+
 ## [2.4.0] - 2026-09-19
 
 ### Added
