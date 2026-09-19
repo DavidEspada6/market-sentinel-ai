@@ -19,7 +19,8 @@ The default binding is local-only. The service does not place real orders.
 - \`GET /api/v1/alerts\` lists persisted alert deliveries.
 - GET /api/v1/runs lists scheduler runs.
 - GET /api/v1/instruments searches the curated instrument universe with optional \`q\`,
-  \`asset_class\` and \`limit\` filters.
+  \`asset_class\`, \`limit\` and \`source\` filters. Source can be \`local\`, \`provider\` or
+  \`auto\`.
 - GET /api/v1/watchlist lists the persistent watchlist.
 - POST /api/v1/watchlist adds a known or custom provider symbol.
 - DELETE /api/v1/watchlist/{symbol} disables a watchlist entry.

@@ -9,6 +9,8 @@ from pathlib import Path
 from market_sentinel_ai.adapters.market_data import (
     DemoMarketDataProvider,
     DemoOrderBookProvider,
+    MarketDataProviderError,
+    build_instrument_search_provider,
     build_market_data_provider,
     build_order_book_provider,
 )
@@ -167,6 +169,7 @@ def main() -> None:
     instruments.add_argument("--query", default="")
     instruments.add_argument("--asset-class", choices=[item.value for item in AssetClass])
     instruments.add_argument("--limit", type=int, default=50)
+    instruments.add_argument("--source", choices=["local", "provider", "auto"], default="local")
 
     watchlist = subparsers.add_parser("watchlist")
     watchlist_group = watchlist.add_mutually_exclusive_group()
@@ -278,7 +281,7 @@ def main() -> None:
         _security_check()
         return
     if command == "instruments":
-        _instruments(args.query, args.asset_class, args.limit)
+        _instruments(settings, args.query, args.asset_class, args.limit, args.source)
         return
     if command == "watchlist":
         _watchlist(settings, args.add, args.remove)
@@ -911,11 +914,33 @@ def _security_check() -> None:
         raise SystemExit(1)
 
 
-def _instruments(query: str, asset_class: str | None, limit: int) -> None:
+def _instruments(
+    settings: Settings,
+    query: str,
+    asset_class: str | None,
+    limit: int,
+    source: str,
+) -> None:
     selected = AssetClass(asset_class) if asset_class else None
+    local = search_instruments(query, selected, limit)
+    if source == "local" or not query.strip():
+        instruments = local
+    else:
+        try:
+            remote = build_instrument_search_provider(settings.instrument_search).search(
+                query, limit
+            )
+        except (MarketDataProviderError, ValueError):
+            remote = []
+        if source == "provider":
+            instruments = remote
+        else:
+            merged = {item.symbol: item for item in local}
+            merged.update({item.symbol: item for item in remote})
+            instruments = list(merged.values())[:limit]
     print(
         json.dumps(
-            [item.to_dict() for item in search_instruments(query, selected, limit)], indent=2
+            [item.to_dict() for item in instruments], indent=2
         )
     )
 

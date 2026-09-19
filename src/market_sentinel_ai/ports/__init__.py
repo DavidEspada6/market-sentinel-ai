@@ -1,6 +1,7 @@
 from market_sentinel_ai.ports.alerts import AlertChannel
 from market_sentinel_ai.ports.backtesting import BacktestEngine
 from market_sentinel_ai.ports.features import FeatureEngine
+from market_sentinel_ai.ports.instrument_search import InstrumentSearchProvider
 from market_sentinel_ai.ports.market_data import MarketDataProvider
 from market_sentinel_ai.ports.models import PredictiveModel
 from market_sentinel_ai.ports.order_book import OrderBookProvider
@@ -13,6 +14,7 @@ __all__ = [
     "BacktestEngine",
     "CandleRepository",
     "FeatureEngine",
+    "InstrumentSearchProvider",
     "MarketDataProvider",
     "OrderBookProvider",
     "PaperPortfolioStore",

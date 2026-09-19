@@ -7,7 +7,12 @@ from market_sentinel_ai.adapters.market_data.binance_order_book import BinanceOr
 from market_sentinel_ai.adapters.market_data.demo import DemoMarketDataProvider
 from market_sentinel_ai.adapters.market_data.stooq import StooqMarketDataProvider
 from market_sentinel_ai.adapters.market_data.yahoo import YahooFinanceMarketDataProvider
-from market_sentinel_ai.config import MarketDataSettings, OrderBookSettings
+from market_sentinel_ai.adapters.market_data.yahoo_search import YahooInstrumentSearchProvider
+from market_sentinel_ai.config import (
+    InstrumentSearchSettings,
+    MarketDataSettings,
+    OrderBookSettings,
+)
 from market_sentinel_ai.ports.market_data import MarketDataProvider
 
 
@@ -52,3 +57,10 @@ def build_order_book_provider(settings: OrderBookSettings) -> object:
             depth=settings.depth,
         )
     raise ValueError("unknown MARKET_ORDER_BOOK_PROVIDER; use demo or binance")
+
+
+def build_instrument_search_provider(settings: InstrumentSearchSettings) -> object:
+    provider = settings.provider.strip().lower().replace("-", "_")
+    if provider in {"yahoo", "yahoo_finance"}:
+        return YahooInstrumentSearchProvider(base_url=settings.base_url)
+    raise ValueError("unknown INSTRUMENT_SEARCH_PROVIDER; use yahoo")

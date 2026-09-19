@@ -4,6 +4,20 @@ All notable changes to Market Sentinel AI will be documented in this file.
 
 The project follows semantic versioning once v1.0.0 is reached. Pre-1.0 releases map to the staged roadmap.
 
+## [2.2.0] - 2026-09-19
+
+### Added
+
+- Added a replaceable Yahoo Finance provider-backed instrument search adapter.
+- Added local, provider-only and combined search modes to the API and CLI.
+- Added provider metadata preservation when adding a search result to the watchlist.
+- Added O2 adapter contract tests without network access or credentials.
+
+### Changed
+
+- Promoted the operational product track to O2 `2.2.0`.
+- Kept local catalog search available when provider search is unavailable in auto mode.
+
 ## [2.1.0] - 2026-09-19
 
 ### Added

@@ -275,6 +275,11 @@ def render_operational_dashboard(
           <option value="fx">FX</option>
           <option value="index">Indices</option>
         </select>
+        <select id="instrument-source" aria-label="Search source">
+          <option value="auto">Local + provider</option>
+          <option value="local">Local catalog</option>
+          <option value="provider">Provider only</option>
+        </select>
         <button type="submit">Search</button>
         <button type="button" class="secondary" id="scan-watchlist">Scan now</button>
       </form>
@@ -299,6 +304,7 @@ def render_operational_dashboard(
     const rows = document.getElementById('watchlist-rows');
     const query = document.getElementById('instrument-query');
     const assetClass = document.getElementById('instrument-class');
+    const source = document.getElementById('instrument-source');
 
     function setStatus(message) {{ status.textContent = message; }}
 
@@ -311,7 +317,9 @@ def render_operational_dashboard(
       button.addEventListener('click', async () => {{
         const response = await fetch('/api/v1/watchlist', {{
           method: 'POST', headers: {{'Content-Type': 'application/json'}},
-          body: JSON.stringify({{symbol: item.symbol}})
+          body: JSON.stringify({{symbol: item.symbol, name: item.name,
+            asset_class: item.asset_class, exchange: item.exchange,
+            currency: item.currency, provider_symbol: item.provider_symbol}})
         }});
         setStatus(response.ok ? `${{item.symbol}} added to watchlist` : 'Could not add instrument');
         if (response.ok) window.location.reload();
@@ -321,7 +329,8 @@ def render_operational_dashboard(
 
     async function searchInstruments(event) {{
       if (event) event.preventDefault();
-      const params = new URLSearchParams({{q: query.value, asset_class: assetClass.value}});
+      const params = new URLSearchParams({{q: query.value, asset_class: assetClass.value,
+        source: source.value}});
       const response = await fetch(`/api/v1/instruments?${{params}}`);
       results.replaceChildren();
       if (!response.ok) {{ setStatus('Search failed'); return; }}

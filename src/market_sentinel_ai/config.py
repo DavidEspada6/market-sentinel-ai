@@ -62,6 +62,12 @@ class MarketDataSettings:
 
 
 @dataclass(frozen=True)
+class InstrumentSearchSettings:
+    provider: str
+    base_url: str
+
+
+@dataclass(frozen=True)
 class OrderBookSettings:
     provider: str
     base_url: str
@@ -92,6 +98,7 @@ class Settings:
     database_url: str
     openai: OpenAISettings
     market_data: MarketDataSettings
+    instrument_search: InstrumentSearchSettings
     order_book: OrderBookSettings
     alerts: AlertSettings
     risk: RiskSettings
@@ -124,6 +131,13 @@ class Settings:
                 api_key=_env_str("MARKET_DATA_API_KEY", ""),
                 base_url=_env_str("MARKET_DATA_BASE_URL", ""),
                 poll_seconds=_env_int("MARKET_DATA_POLL_SECONDS", 60),
+            ),
+            instrument_search=InstrumentSearchSettings(
+                provider=_env_str("INSTRUMENT_SEARCH_PROVIDER", "yahoo"),
+                base_url=_env_str(
+                    "INSTRUMENT_SEARCH_BASE_URL",
+                    "https://query1.finance.yahoo.com/v1/finance/search",
+                ),
             ),
             order_book=OrderBookSettings(
                 provider=_env_str("MARKET_ORDER_BOOK_PROVIDER", "demo"),

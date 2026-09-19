@@ -6,10 +6,15 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 
+from market_sentinel_ai.adapters.market_data import (
+    MarketDataProviderError,
+    build_instrument_search_provider,
+)
 from market_sentinel_ai.config import Settings
 from market_sentinel_ai.dashboard import render_operational_dashboard
 from market_sentinel_ai.domain.instruments import (
     AssetClass,
+    Instrument,
     custom_instrument,
     find_instrument,
     search_instruments,
@@ -30,6 +35,11 @@ class ScanRequest(BaseModel):
 
 class WatchlistRequest(BaseModel):
     symbol: str = Field(min_length=1, max_length=24)
+    name: str | None = Field(default=None, max_length=120)
+    asset_class: str | None = None
+    exchange: str | None = Field(default=None, max_length=60)
+    currency: str | None = Field(default=None, max_length=12)
+    provider_symbol: str | None = Field(default=None, max_length=24)
 
 
 class WatchlistScanRequest(BaseModel):
@@ -98,12 +108,29 @@ def create_app(
         q: str = "",
         asset_class: str | None = None,
         limit: int = Query(default=50, ge=1, le=200),
+        source: str = "local",
     ) -> list[dict[str, object]]:
         try:
             selected_class = AssetClass(asset_class) if asset_class else None
         except ValueError as exc:
             raise HTTPException(status_code=422, detail="unsupported asset class") from exc
-        return [item.to_dict() for item in search_instruments(q, selected_class, limit)]
+        local = search_instruments(q, selected_class, limit)
+        if source not in {"local", "provider", "auto"}:
+            raise HTTPException(status_code=422, detail="unsupported instrument search source")
+        if source == "local" or not q.strip():
+            return [item.to_dict() for item in local]
+        try:
+            provider = build_instrument_search_provider(active_settings.instrument_search)
+            remote = provider.search(q, limit)
+        except (MarketDataProviderError, ValueError) as exc:
+            if source == "provider":
+                raise HTTPException(status_code=502, detail=str(exc)) from exc
+            remote = []
+        if source == "provider":
+            return [item.to_dict() for item in remote]
+        merged = {item.symbol: item for item in local}
+        merged.update({item.symbol: item for item in remote})
+        return [item.to_dict() for item in list(merged.values())[:limit]]
 
     @app.get("/api/v1/watchlist")
     def watchlist() -> list[dict[str, object]]:
@@ -112,7 +139,31 @@ def create_app(
     @app.post("/api/v1/watchlist")
     def add_watchlist_item(request: WatchlistRequest) -> dict[str, object]:
         try:
-            instrument = find_instrument(request.symbol) or custom_instrument(request.symbol)
+            known = find_instrument(request.symbol)
+            if known and not any(
+                value is not None
+                for value in (
+                    request.name,
+                    request.asset_class,
+                    request.exchange,
+                    request.currency,
+                    request.provider_symbol,
+                )
+            ):
+                instrument = known
+            else:
+                instrument = Instrument(
+                    symbol=request.symbol,
+                    name=request.name or (known.name if known else request.symbol.upper()),
+                    asset_class=AssetClass(
+                        request.asset_class or (known.asset_class if known else "equity")
+                    ),
+                    exchange=request.exchange or (known.exchange if known else "unknown"),
+                    currency=request.currency or (known.currency if known else "USD"),
+                    provider_symbol=request.provider_symbol
+                    or (known.market_symbol if known else None),
+                    featured=known.featured if known else False,
+                )
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
         return repository.add_watchlist_item(instrument).to_dict()
