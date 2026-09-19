@@ -1,0 +1,34 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+from datetime import datetime
+from enum import StrEnum
+
+
+class Timeframe(StrEnum):
+    ONE_MINUTE = "1m"
+    FIVE_MINUTES = "5m"
+    FIFTEEN_MINUTES = "15m"
+    ONE_HOUR = "1h"
+    ONE_DAY = "1d"
+
+
+@dataclass(frozen=True)
+class Candle:
+    symbol: str
+    timeframe: Timeframe
+    opened_at: datetime
+    open: float
+    high: float
+    low: float
+    close: float
+    volume: float
+
+    def __post_init__(self) -> None:
+        if self.high < max(self.open, self.close):
+            raise ValueError("high must be at least open and close")
+        if self.low > min(self.open, self.close):
+            raise ValueError("low must be at most open and close")
+        if self.volume < 0:
+            raise ValueError("volume cannot be negative")
+

@@ -1,0 +1,64 @@
+[project]
+name = "market-sentinel-ai"
+version = "0.1.0"
+description = "Predictive market analysis and alerting system with a quantitative core and GPT-6 Astra as contextual reasoning layer."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [
+  { name = "David Espada" }
+]
+keywords = ["trading", "market-analysis", "backtesting", "alerts", "openai", "gpt-6-astra"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Financial and Insurance Industry",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Topic :: Office/Business :: Financial :: Investment",
+]
+dependencies = []
+
+[project.optional-dependencies]
+api = [
+  "fastapi>=0.115.0",
+  "uvicorn[standard]>=0.30.0",
+]
+ml = [
+  "numpy>=2.0.0",
+  "pandas>=2.2.0",
+  "scikit-learn>=1.5.0",
+  "xgboost>=2.1.0",
+  "lightgbm>=4.5.0",
+]
+openai = [
+  "openai>=1.60.0",
+]
+dev = [
+  "ruff>=0.8.0",
+  "mypy>=1.13.0",
+  "pytest>=8.3.0",
+]
+
+[project.scripts]
+market-sentinel = "market_sentinel_ai.cli:main"
+
+[build-system]
+requires = ["setuptools>=75.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+files = ["src/market_sentinel_ai", "tests"]
+

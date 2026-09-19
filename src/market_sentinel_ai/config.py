@@ -1,0 +1,113 @@
+from __future__ import annotations
+
+import os
+from dataclasses import dataclass
+
+
+def _env_str(name: str, default: str) -> str:
+    value = os.getenv(name)
+    return default if value is None or value == "" else value
+
+
+def _env_float(name: str, default: float) -> float:
+    value = os.getenv(name)
+    if value is None or value == "":
+        return default
+    return float(value)
+
+
+def _env_int(name: str, default: int) -> int:
+    value = os.getenv(name)
+    if value is None or value == "":
+        return default
+    return int(value)
+
+
+def _env_bool(name: str, default: bool) -> bool:
+    value = os.getenv(name)
+    if value is None or value == "":
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "y", "on"}
+
+
+@dataclass(frozen=True)
+class OpenAISettings:
+    api_key: str
+    model: str
+    reasoning_effort: str
+    max_context_requests_per_day: int
+    min_signal_confidence: float
+
+    @property
+    def enabled(self) -> bool:
+        return bool(self.api_key)
+
+
+@dataclass(frozen=True)
+class MarketDataSettings:
+    provider: str
+    api_key: str
+
+    @property
+    def has_credentials(self) -> bool:
+        return bool(self.api_key)
+
+
+@dataclass(frozen=True)
+class AlertSettings:
+    dry_run: bool
+    email_from: str
+    email_to: str
+    webhook_url: str
+
+
+@dataclass(frozen=True)
+class RiskSettings:
+    max_position_pct: float
+    max_daily_loss_pct: float
+    default_fee_bps: float
+    default_slippage_bps: float
+
+
+@dataclass(frozen=True)
+class Settings:
+    environment: str
+    database_url: str
+    openai: OpenAISettings
+    market_data: MarketDataSettings
+    alerts: AlertSettings
+    risk: RiskSettings
+
+    @classmethod
+    def from_env(cls) -> Settings:
+        return cls(
+            environment=_env_str("MARKET_SENTINEL_ENV", "local"),
+            database_url=_env_str(
+                "MARKET_SENTINEL_DB_URL",
+                "sqlite:///./data/market_sentinel.sqlite3",
+            ),
+            openai=OpenAISettings(
+                api_key=_env_str("OPENAI_API_KEY", ""),
+                model=_env_str("OPENAI_MODEL", "gpt-6-astra"),
+                reasoning_effort=_env_str("OPENAI_REASONING_EFFORT", "low"),
+                max_context_requests_per_day=_env_int("ASTRA_MAX_CONTEXT_REQUESTS_PER_DAY", 25),
+                min_signal_confidence=_env_float("ASTRA_MIN_SIGNAL_CONFIDENCE", 0.72),
+            ),
+            market_data=MarketDataSettings(
+                provider=_env_str("MARKET_DATA_PROVIDER", "demo"),
+                api_key=_env_str("MARKET_DATA_API_KEY", ""),
+            ),
+            alerts=AlertSettings(
+                dry_run=_env_bool("ALERTS_DRY_RUN", True),
+                email_from=_env_str("ALERT_EMAIL_FROM", ""),
+                email_to=_env_str("ALERT_EMAIL_TO", ""),
+                webhook_url=_env_str("ALERT_WEBHOOK_URL", ""),
+            ),
+            risk=RiskSettings(
+                max_position_pct=_env_float("RISK_MAX_POSITION_PCT", 0.02),
+                max_daily_loss_pct=_env_float("RISK_MAX_DAILY_LOSS_PCT", 0.03),
+                default_fee_bps=_env_float("RISK_DEFAULT_FEE_BPS", 1.0),
+                default_slippage_bps=_env_float("RISK_DEFAULT_SLIPPAGE_BPS", 2.0),
+            ),
+        )
+
