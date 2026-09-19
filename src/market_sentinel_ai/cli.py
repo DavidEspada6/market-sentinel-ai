@@ -19,7 +19,10 @@ from market_sentinel_ai.models import (
     WeightedEnsembleModel,
     WeightedModel,
 )
+from market_sentinel_ai.monitoring import FeatureDriftDetector, JsonlEventLogger
+from market_sentinel_ai.paper import PaperTradingLedger
 from market_sentinel_ai.regime import VolatilityRegimeDetector
+from market_sentinel_ai.domain.risk import RiskLimits
 from market_sentinel_ai.releases import CURRENT_RELEASE, RELEASE_PLAN
 from market_sentinel_ai.signals import SignalEngine
 from market_sentinel_ai.storage import SQLiteCandleRepository, sqlite_path_from_url
@@ -74,6 +77,16 @@ def main() -> None:
     astra.add_argument("--timeframe", choices=[item.value for item in Timeframe], default="5m")
     astra.add_argument("--days", type=int, default=10)
 
+    paper = subparsers.add_parser("paper-demo")
+    paper.add_argument("--symbol", default="SPY")
+    paper.add_argument("--timeframe", choices=[item.value for item in Timeframe], default="5m")
+    paper.add_argument("--days", type=int, default=10)
+
+    drift = subparsers.add_parser("drift-demo")
+    drift.add_argument("--symbol", default="SPY")
+    drift.add_argument("--timeframe", choices=[item.value for item in Timeframe], default="5m")
+    drift.add_argument("--days", type=int, default=20)
+
     args = parser.parse_args()
     command = args.command or "status"
     settings = Settings.from_env()
@@ -109,6 +122,12 @@ def main() -> None:
         return
     if command == "astra-context-demo":
         _astra_context_demo(settings, args.symbol, Timeframe(args.timeframe), args.days)
+        return
+    if command == "paper-demo":
+        _paper_demo(settings, args.symbol, Timeframe(args.timeframe), args.days)
+        return
+    if command == "drift-demo":
+        _drift_demo(args.symbol, Timeframe(args.timeframe), args.days)
         return
     parser.error(f"unknown command: {command}")
 
@@ -372,6 +391,80 @@ def _astra_context_demo(settings: Settings, symbol: str, timeframe: Timeframe, d
                 "invalidation": reasoning.invalidation if reasoning else None,
                 "risk_notes": list(reasoning.risk_notes) if reasoning else [],
                 "context_sources": list(reasoning.context_sources) if reasoning else [],
+            },
+            indent=2,
+            sort_keys=True,
+        )
+    )
+
+
+def _paper_demo(settings: Settings, symbol: str, timeframe: Timeframe, days: int) -> None:
+    end = datetime.now(tz=UTC).replace(second=0, microsecond=0)
+    start = end - timedelta(days=days)
+    provider = DemoMarketDataProvider()
+    candles = list(provider.historical_candles(symbol, timeframe, start, end))
+    signal = _demo_signal(settings, symbol, timeframe, days)
+    if not signal.is_actionable and len(candles) >= 2:
+        prediction = MomentumBaselineModel(horizon_minutes=5, momentum_threshold_bps=0.0).predict(
+            OHLCVFeatureEngine(rolling_window=20).transform(candles)
+        )
+        signal = SignalEngine(min_probability=0.5, min_expected_return_bps=0.0).from_prediction(
+            prediction
+        )
+    ledger = PaperTradingLedger(starting_equity=100_000)
+    risk = RiskLimits(
+        max_position_pct=settings.risk.max_position_pct,
+        max_daily_loss_pct=settings.risk.max_daily_loss_pct,
+        fee_bps=settings.risk.default_fee_bps,
+        slippage_bps=settings.risk.default_slippage_bps,
+    )
+    trade = ledger.simulate_round_trip(
+        signal=signal,
+        entry_price=candles[-2].open,
+        exit_price=candles[-1].close,
+        opened_at=candles[-2].opened_at,
+        closed_at=candles[-1].opened_at,
+        risk=risk,
+    )
+    JsonlEventLogger("logs/paper-demo.jsonl").log(
+        "paper_demo",
+        {
+            "symbol": symbol.upper(),
+            "trade_created": trade is not None,
+            "equity": ledger.equity,
+        },
+    )
+    print(
+        json.dumps(
+            {
+                "mode": "paper",
+                "real_orders": False,
+                "symbol": symbol.upper(),
+                "trade_created": trade is not None,
+                "equity": ledger.equity,
+                "total_pnl": ledger.total_pnl,
+                "trade_pnl": trade.pnl if trade else None,
+            },
+            indent=2,
+            sort_keys=True,
+        )
+    )
+
+
+def _drift_demo(symbol: str, timeframe: Timeframe, days: int) -> None:
+    end = datetime.now(tz=UTC).replace(second=0, microsecond=0)
+    start = end - timedelta(days=days)
+    candles = list(DemoMarketDataProvider().historical_candles(symbol, timeframe, start, end))
+    features = OHLCVFeatureEngine(rolling_window=20).transform(candles)
+    midpoint = len(features) // 2
+    report = FeatureDriftDetector(threshold=2.5).compare(features[:midpoint], features[midpoint:])
+    print(
+        json.dumps(
+            {
+                "symbol": symbol.upper(),
+                "drifted": report.drifted,
+                "threshold": report.threshold,
+                "scores": report.scores,
             },
             indent=2,
             sort_keys=True,

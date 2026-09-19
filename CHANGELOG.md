@@ -4,6 +4,17 @@ All notable changes to Market Sentinel AI will be documented in this file.
 
 The project follows semantic versioning once v1.0.0 is reached. Pre-1.0 releases map to the staged roadmap.
 
+## [1.0.0] - 2026-09-19
+
+### Added
+
+- Added paper trading ledger with simulated round-trip trades and cost handling.
+- Added feature drift detector.
+- Added JSONL operational event logger.
+- Added CLI commands for paper trading and drift demos.
+- Added v1 operations documentation.
+- Added tests for paper trading, drift and event logging.
+
 ## [0.7.0] - 2026-09-19
 
 ### Added
