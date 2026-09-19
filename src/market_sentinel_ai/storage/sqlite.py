@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import sqlite3
 from collections.abc import Iterable
 from contextlib import closing
@@ -8,6 +9,7 @@ from pathlib import Path
 
 from market_sentinel_ai.domain.ingestion import IngestionRun
 from market_sentinel_ai.domain.market import Candle, Timeframe
+from market_sentinel_ai.domain.operations import AlertRecord, SchedulerRunRecord, SignalRecord
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS candles (
@@ -43,6 +45,52 @@ CREATE TABLE IF NOT EXISTS ingestion_runs (
 
 CREATE INDEX IF NOT EXISTS idx_ingestion_runs_finished_at
 ON ingestion_runs(finished_at DESC);
+
+CREATE TABLE IF NOT EXISTS signals (
+    signal_id TEXT PRIMARY KEY,
+    symbol TEXT NOT NULL,
+    timeframe TEXT NOT NULL,
+    generated_at TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    direction TEXT NOT NULL,
+    probability REAL NOT NULL,
+    confidence REAL NOT NULL,
+    model_name TEXT NOT NULL,
+    expected_return_bps REAL,
+    rationale TEXT NOT NULL,
+    risk_notes_json TEXT NOT NULL,
+    metadata_json TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_signals_symbol_created_at
+ON signals(symbol, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS alerts (
+    alert_id TEXT PRIMARY KEY,
+    signal_id TEXT NOT NULL,
+    channel TEXT NOT NULL,
+    status TEXT NOT NULL,
+    external_id TEXT,
+    created_at TEXT NOT NULL,
+    error TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_alerts_created_at
+ON alerts(created_at DESC);
+
+CREATE TABLE IF NOT EXISTS scheduler_runs (
+    run_id TEXT PRIMARY KEY,
+    started_at TEXT NOT NULL,
+    finished_at TEXT NOT NULL,
+    status TEXT NOT NULL,
+    symbols_json TEXT NOT NULL,
+    signal_count INTEGER NOT NULL,
+    alert_count INTEGER NOT NULL,
+    error TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_scheduler_runs_finished_at
+ON scheduler_runs(finished_at DESC);
 """
 
 
@@ -182,6 +230,159 @@ class SQLiteCandleRepository:
                 fetched_rows=row["fetched_rows"],
                 stored_rows=row["stored_rows"],
                 quality_json=row["quality_json"],
+                error=row["error"],
+            )
+            for row in rows
+        ]
+
+    def record_signal(self, signal: SignalRecord) -> None:
+        with closing(self._connect()) as connection, connection:
+            connection.execute(
+                """
+                INSERT INTO signals (
+                    signal_id, symbol, timeframe, generated_at, created_at, direction,
+                    probability, confidence, model_name, expected_return_bps, rationale,
+                    risk_notes_json, metadata_json
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    signal.signal_id,
+                    signal.symbol,
+                    signal.timeframe,
+                    signal.generated_at.isoformat(),
+                    signal.created_at.isoformat(),
+                    signal.direction.value,
+                    signal.probability,
+                    signal.confidence,
+                    signal.model_name,
+                    signal.expected_return_bps,
+                    signal.rationale,
+                    json.dumps(signal.risk_notes, sort_keys=True),
+                    json.dumps(signal.metadata, sort_keys=True),
+                ),
+            )
+
+    def list_signals(
+        self,
+        symbol: str | None = None,
+        timeframe: str | None = None,
+        limit: int = 50,
+    ) -> list[SignalRecord]:
+        if limit <= 0:
+            raise ValueError("limit must be positive")
+        clauses: list[str] = []
+        values: list[object] = []
+        if symbol:
+            clauses.append("symbol = ?")
+            values.append(symbol.upper())
+        if timeframe:
+            clauses.append("timeframe = ?")
+            values.append(timeframe)
+        where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+        with closing(self._connect()) as connection:
+            rows = connection.execute(
+                f"""
+                SELECT signal_id, symbol, timeframe, generated_at, created_at, direction,
+                       probability, confidence, model_name, expected_return_bps, rationale,
+                       risk_notes_json, metadata_json
+                FROM signals
+                {where}
+                ORDER BY created_at DESC
+                LIMIT ?
+                """,
+                (*values, limit),
+            ).fetchall()
+        return [SignalRecord.from_row(row) for row in rows]
+
+    def record_alert(self, alert: AlertRecord) -> None:
+        with closing(self._connect()) as connection, connection:
+            connection.execute(
+                """
+                INSERT INTO alerts (
+                    alert_id, signal_id, channel, status, external_id, created_at, error
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    alert.alert_id,
+                    alert.signal_id,
+                    alert.channel,
+                    alert.status,
+                    alert.external_id,
+                    alert.created_at.isoformat(),
+                    alert.error,
+                ),
+            )
+
+    def list_alerts(self, limit: int = 50) -> list[AlertRecord]:
+        if limit <= 0:
+            raise ValueError("limit must be positive")
+        with closing(self._connect()) as connection:
+            rows = connection.execute(
+                """
+                SELECT alert_id, signal_id, channel, status, external_id, created_at, error
+                FROM alerts
+                ORDER BY created_at DESC
+                LIMIT ?
+                """,
+                (limit,),
+            ).fetchall()
+        return [
+            AlertRecord(
+                alert_id=row["alert_id"],
+                signal_id=row["signal_id"],
+                channel=row["channel"],
+                status=row["status"],
+                external_id=row["external_id"],
+                created_at=datetime.fromisoformat(row["created_at"]),
+                error=row["error"],
+            )
+            for row in rows
+        ]
+
+    def record_scheduler_run(self, run: SchedulerRunRecord) -> None:
+        with closing(self._connect()) as connection, connection:
+            connection.execute(
+                """
+                INSERT INTO scheduler_runs (
+                    run_id, started_at, finished_at, status, symbols_json,
+                    signal_count, alert_count, error
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    run.run_id,
+                    run.started_at.isoformat(),
+                    run.finished_at.isoformat(),
+                    run.status,
+                    json.dumps(run.symbols, sort_keys=True),
+                    run.signal_count,
+                    run.alert_count,
+                    run.error,
+                ),
+            )
+
+    def list_scheduler_runs(self, limit: int = 20) -> list[SchedulerRunRecord]:
+        if limit <= 0:
+            raise ValueError("limit must be positive")
+        with closing(self._connect()) as connection:
+            rows = connection.execute(
+                """
+                SELECT run_id, started_at, finished_at, status, symbols_json,
+                       signal_count, alert_count, error
+                FROM scheduler_runs
+                ORDER BY finished_at DESC
+                LIMIT ?
+                """,
+                (limit,),
+            ).fetchall()
+        return [
+            SchedulerRunRecord(
+                run_id=row["run_id"],
+                started_at=datetime.fromisoformat(row["started_at"]),
+                finished_at=datetime.fromisoformat(row["finished_at"]),
+                status=row["status"],
+                symbols=tuple(json.loads(row["symbols_json"])),
+                signal_count=row["signal_count"],
+                alert_count=row["alert_count"],
                 error=row["error"],
             )
             for row in rows

@@ -1,8 +1,8 @@
 # Operations
 
-The original v1.0.0 is a prototype baseline. The completion track is active; v1.2.0 adds real
-boosting models, model artifacts and purged walk-forward evaluation while preserving alert-only
-and paper-trading boundaries.
+The original v1.0.0 is a prototype baseline. The completion track is active; v1.3.0 adds the
+local API, operational dashboard, scheduled scans and persistent signal/alert records while
+preserving alert-only and paper-trading boundaries.
 
 ## Supported Mode
 
@@ -21,12 +21,16 @@ and paper-trading boundaries.
 - Paper trading ledger.
 - Drift checks.
 - JSONL operational events.
+- Local FastAPI service with health, status, scan, signal, alert and scheduler-run endpoints.
+- SQLite-backed operational dashboard.
+- One-shot and polling scheduler commands.
 
 ## Not Supported In v1
 
 - Real-money order execution.
 - Broker account trading.
 - Autonomous position management.
+- Live order execution.
 
 ## Production Checklist
 

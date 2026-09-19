@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from html import escape
 
+from market_sentinel_ai.domain.operations import AlertRecord, SignalRecord
 from market_sentinel_ai.domain.prediction import Signal
 from market_sentinel_ai.ports.backtesting import BacktestReport
 
@@ -179,3 +180,118 @@ def _format_float(value: float) -> str:
     if value == float("inf"):
         return "inf"
     return f"{value:.2f}"
+
+
+def render_operational_dashboard(
+    signals: list[SignalRecord],
+    alerts: list[AlertRecord],
+    *,
+    generated_at_iso: str,
+    environment: str,
+) -> str:
+    signal_rows = "\n".join(_render_signal_record(signal) for signal in signals) or (
+        '<tr><td colspan="6">No persisted signals</td></tr>'
+    )
+    alert_rows = "\n".join(_render_alert_record(alert) for alert in alerts) or (
+        '<tr><td colspan="5">No persisted alerts</td></tr>'
+    )
+    return f"""<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Market Sentinel AI</title>
+  <style>
+    :root {{ color-scheme: light; --bg: #f5f7f8; --panel: #fff; --ink: #182026;
+      --muted: #5e6a72; --line: #d9e0e4; --teal: #087f8c; --red: #b42318; --green: #16803c; }}
+    * {{ box-sizing: border-box; }}
+    body {{ margin: 0; font-family: Inter, Segoe UI, Arial, sans-serif; background: var(--bg);
+      color: var(--ink); letter-spacing: 0; }}
+    header {{ background: var(--panel); border-bottom: 1px solid var(--line); padding: 18px 24px;
+      display: flex; justify-content: space-between; align-items: center; gap: 16px; }}
+    h1 {{ font-size: 22px; margin: 0; }}
+    h2 {{ font-size: 16px; margin: 0 0 12px; }}
+    main {{ max-width: 1180px; margin: 0 auto; padding: 24px; }}
+    .meta {{ color: var(--muted); font-size: 13px; }}
+    .toolbar {{ display: flex; align-items: center; gap: 12px; }}
+    button {{ background: var(--teal); border: 0; border-radius: 5px; color: #fff; cursor: pointer;
+      font: inherit; padding: 8px 12px; }}
+    section {{ margin-top: 20px; }}
+    .panel {{ background: var(--panel); border: 1px solid var(--line); border-radius: 6px;
+      padding: 16px; }}
+    .summary {{ display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }}
+    .metric {{ border-left: 3px solid var(--teal); padding-left: 12px; }}
+    .metric strong {{ display: block; font-size: 24px; margin-top: 4px; }}
+    table {{ width: 100%; border-collapse: collapse; background: var(--panel); }}
+    th, td {{ border-bottom: 1px solid var(--line); padding: 10px 12px; text-align: left; }}
+    th {{ color: var(--muted); font-size: 12px; text-transform: uppercase; }}
+    .long {{ color: var(--green); font-weight: 700; }}
+    .short {{ color: var(--red); font-weight: 700; }}
+    .no-trade, .muted {{ color: var(--muted); }}
+    @media (max-width: 760px) {{ header {{ align-items: flex-start; flex-direction: column; }}
+      main {{ padding: 14px; }} .summary {{ grid-template-columns: 1fr; }}
+      .panel {{ overflow-x: auto; }} table {{ min-width: 680px; }} }}
+  </style>
+</head>
+<body>
+  <header>
+    <div><h1>Market Sentinel AI</h1><div class="meta">Operational dashboard</div></div>
+    <div class="toolbar"><span class="meta">{escape(environment)} -
+      {escape(generated_at_iso)}</span>
+      <button type="button" onclick="window.location.reload()">Refresh</button></div>
+  </header>
+  <main>
+    <div class="summary">
+      {_operational_metric("Persisted signals", str(len(signals)))}
+      {_operational_metric("Alert records", str(len(alerts)))}
+      {_operational_metric(
+          "Actionable signals",
+          str(sum(signal.direction.value != "NO_TRADE" for signal in signals))
+      )}
+    </div>
+    <section><div class="panel"><h2>Latest signals</h2>
+      <table><thead><tr><th>Symbol</th><th>Timeframe</th><th>Direction</th><th>Confidence</th>
+        <th>Model</th><th>Generated</th></tr></thead><tbody>{signal_rows}</tbody></table>
+    </div></section>
+    <section><div class="panel"><h2>Alert history</h2>
+      <table><thead><tr><th>Channel</th><th>Status</th><th>External ID</th><th>Created</th>
+        <th>Error</th>
+        </tr></thead><tbody>{alert_rows}</tbody></table>
+    </div></section>
+  </main>
+</body>
+</html>
+"""
+
+
+def _operational_metric(label: str, value: str) -> str:
+    return (
+        f'<div class="panel metric"><span class="meta">{escape(label)}</span>'
+        f"<strong>{escape(value)}</strong></div>"
+    )
+
+
+def _render_signal_record(signal: SignalRecord) -> str:
+    direction = signal.direction.value
+    return (
+        "<tr>"
+        f"<td>{escape(signal.symbol)}</td>"
+        f"<td>{escape(signal.timeframe)}</td>"
+        f'<td class="{direction.lower().replace("_", "-")}">{escape(direction)}</td>'
+        f"<td>{signal.confidence:.2f}</td>"
+        f"<td>{escape(signal.model_name)}</td>"
+        f"<td>{escape(signal.generated_at.isoformat())}</td>"
+        "</tr>"
+    )
+
+
+def _render_alert_record(alert: AlertRecord) -> str:
+    return (
+        "<tr>"
+        f"<td>{escape(alert.channel)}</td>"
+        f"<td>{escape(alert.status)}</td>"
+        f'<td>{escape(alert.external_id or "-")}</td>'
+        f"<td>{escape(alert.created_at.isoformat())}</td>"
+        f'<td>{escape(alert.error or "-")}</td>'
+        "</tr>"
+    )

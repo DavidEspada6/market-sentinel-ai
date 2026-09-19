@@ -4,6 +4,18 @@ All notable changes to Market Sentinel AI will be documented in this file.
 
 The project follows semantic versioning once v1.0.0 is reached. Pre-1.0 releases map to the staged roadmap.
 
+## [1.3.0] - 2026-09-19
+
+### Added
+
+- Added a local FastAPI application with health, status, signal, alert, scheduler-run and scan
+  endpoints.
+- Added an operational HTML dashboard backed by persisted SQLite signals and alert history.
+- Added a scan service that ingests market data, generates risk-gated baseline signals, persists
+  them and records dry-run or configured webhook alerts.
+- Added a scheduler that supports one-shot scans and a long-running polling loop for watchlists.
+- Added C3 integration tests and API dependencies to CI.
+
 ## [1.2.0] - 2026-09-19
 
 ### Added

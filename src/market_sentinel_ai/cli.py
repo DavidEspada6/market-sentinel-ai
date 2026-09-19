@@ -33,6 +33,7 @@ from market_sentinel_ai.models import (
     XGBoostDirectionalModel,
 )
 from market_sentinel_ai.monitoring import FeatureDriftDetector, JsonlEventLogger
+from market_sentinel_ai.operations import MarketScanService, MarketScheduler
 from market_sentinel_ai.paper import PaperTradingLedger
 from market_sentinel_ai.reasoning import (
     AstraCostPolicy,
@@ -131,6 +132,22 @@ def main() -> None:
     drift.add_argument("--timeframe", choices=[item.value for item in Timeframe], default="5m")
     drift.add_argument("--days", type=int, default=20)
 
+    scan = subparsers.add_parser("scan")
+    scan.add_argument("--symbol", default="SPY")
+    scan.add_argument("--timeframe", choices=[item.value for item in Timeframe], default="5m")
+    scan.add_argument("--days", type=int, default=5)
+
+    serve = subparsers.add_parser("serve")
+    serve.add_argument("--host", default="127.0.0.1")
+    serve.add_argument("--port", type=int, default=8000)
+
+    schedule = subparsers.add_parser("schedule")
+    schedule.add_argument("--symbols", default="SPY")
+    schedule.add_argument("--timeframe", choices=[item.value for item in Timeframe], default="5m")
+    schedule.add_argument("--days", type=int, default=5)
+    schedule.add_argument("--interval-seconds", type=int, default=60)
+    schedule.add_argument("--once", action="store_true")
+
     args = parser.parse_args()
     command = args.command or "status"
     settings = Settings.from_env()
@@ -195,6 +212,22 @@ def main() -> None:
         return
     if command == "drift-demo":
         _drift_demo(args.symbol, Timeframe(args.timeframe), args.days)
+        return
+    if command == "scan":
+        _scan(settings, args.symbol, Timeframe(args.timeframe), args.days)
+        return
+    if command == "serve":
+        _serve(settings, args.host, args.port)
+        return
+    if command == "schedule":
+        _schedule(
+            settings,
+            tuple(symbol.strip() for symbol in args.symbols.split(",") if symbol.strip()),
+            Timeframe(args.timeframe),
+            args.days,
+            args.interval_seconds,
+            args.once,
+        )
         return
     parser.error(f"unknown command: {command}")
 
@@ -417,6 +450,35 @@ def _list_ingestion_runs(settings: Settings, limit: int) -> None:
         for run in runs
     ]
     print(json.dumps(payload, indent=2, sort_keys=True))
+
+
+def _scan(settings: Settings, symbol: str, timeframe: Timeframe, days: int) -> None:
+    result = MarketScanService(settings).scan(symbol, timeframe, days)
+    print(json.dumps(result.to_dict(), indent=2, sort_keys=True))
+
+
+def _serve(settings: Settings, host: str, port: int) -> None:
+    import uvicorn
+
+    from market_sentinel_ai.api import create_app
+
+    uvicorn.run(create_app(settings), host=host, port=port)
+
+
+def _schedule(
+    settings: Settings,
+    symbols: tuple[str, ...],
+    timeframe: Timeframe,
+    days: int,
+    interval_seconds: int,
+    once: bool,
+) -> None:
+    scheduler = MarketScheduler(MarketScanService(settings), interval_seconds=interval_seconds)
+    if once:
+        payload = scheduler.run_once(symbols, timeframe, days).to_dict()
+        print(json.dumps(payload, indent=2, sort_keys=True))
+        return
+    scheduler.run_forever(symbols, timeframe, days)
 
 
 def _signals_demo(settings: Settings, symbol: str, timeframe: Timeframe, days: int) -> None:

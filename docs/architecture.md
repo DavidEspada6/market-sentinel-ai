@@ -61,11 +61,12 @@ empty input, duplicate timestamps and ordering before storage. Quality reports a
 intraday gaps and staleness. The storage boundary allows later replacement with Postgres,
 DuckDB or managed infrastructure.
 
-### Dashboard
+### Operational Application
 
-The current generated dashboard is a static snapshot. C3 turns it into a local operational web
-application focused on watchlists, current signals, model state, risk exposure, backtest summaries
-and alert history.
+The C3 application exposes a local FastAPI service and HTML dashboard focused on current signals,
+alert history and scheduler health. SQLite persists candles, ingestion runs, signals, alerts and
+scheduler runs. The scheduler can run once for a controlled check or poll a watchlist until
+stopped.
 
 ## Data Flow
 

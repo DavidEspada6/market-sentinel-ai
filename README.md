@@ -2,7 +2,7 @@
 
 Market Sentinel AI is a predictive market analysis and alerting application. Its core loop is quantitative, cheap and deterministic: market data ingestion, feature engineering, supervised models, walk-forward backtesting, risk controls and alerting. GPT-6 Astra is reserved for contextual reasoning when a signal is important enough to justify the extra cost.
 
-Market Sentinel AI v1.2.0 is an alerting and paper-trading market analysis application under active completion. It includes deterministic demo data, replaceable Yahoo Finance, Stooq and Alpha Vantage market-data adapters, quality-gated SQLite ingestion, causal OHLCV/volatility features, trainable XGBoost and LightGBM models, purged walk-forward evaluation, cost-aware backtesting, signal generation, dry-run alerts, dashboard generation, regime detection, weighted ensemble, gated GPT-6 Astra contextual reasoning, paper trading, drift checks and operational logs. It does not place live trades.
+Market Sentinel AI v1.3.0 is an alerting and paper-trading market analysis application under active completion. It includes deterministic demo data, replaceable Yahoo Finance, Stooq and Alpha Vantage market-data adapters, quality-gated SQLite ingestion, causal OHLCV/volatility features, trainable XGBoost and LightGBM models, purged walk-forward evaluation, cost-aware backtesting, persistent operational signals, a local API and dashboard, scheduled scans, dry-run/webhook alerts, regime detection, weighted ensemble, gated GPT-6 Astra contextual reasoning, paper trading, drift checks and operational logs. It does not place live trades.
 
 ## Safety Position
 
@@ -36,6 +36,7 @@ python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install -e .[dev]
 python -m pip install -e ".[dev,ml]"  # C2 boosting models
+python -m pip install -e ".[dev,ml,api]"  # C3 API and dashboard
 Copy-Item .env.example .env
 python -m unittest discover -s tests
 python -m market_sentinel_ai
@@ -54,6 +55,9 @@ python -m market_sentinel_ai ensemble-demo --symbol SPY --timeframe 5m --days 20
 python -m market_sentinel_ai astra-context-demo --symbol SPY --timeframe 5m --days 10
 python -m market_sentinel_ai paper-demo --symbol SPY --timeframe 5m --days 10
 python -m market_sentinel_ai drift-demo --symbol SPY --timeframe 5m --days 20
+python -m market_sentinel_ai scan --symbol SPY --timeframe 5m --days 5
+python -m market_sentinel_ai schedule --symbols SPY,QQQ --timeframe 5m --once
+python -m market_sentinel_ai serve --host 127.0.0.1 --port 8000
 ```
 
 Yahoo Finance and Stooq need no API key. Stooq may require browser verification in some regions, so Yahoo is the primary no-key adapter. Alpha Vantage uses `MARKET_DATA_API_KEY`; select it with `MARKET_DATA_PROVIDER=alpha_vantage`. Provider URLs and polling intervals can be overridden without changing application code. Optional ML, API and OpenAI dependencies remain behind extras.
@@ -84,6 +88,7 @@ Read [docs/architecture.md](docs/architecture.md) for the module boundaries and 
 Read [docs/market-data.md](docs/market-data.md) for provider setup, limits and ingestion quality.
 Read [docs/models.md](docs/models.md) for training, purging, artifacts and evaluation metrics.
 Read [docs/astra.md](docs/astra.md) for the R6 GPT-6 Astra integration rules.
+Read [docs/api.md](docs/api.md) for the local API, dashboard and scheduler.
 Read [docs/operations.md](docs/operations.md) for the v1 operating boundaries.
 
 ## Why Astra Is Not the Continuous Predictor
