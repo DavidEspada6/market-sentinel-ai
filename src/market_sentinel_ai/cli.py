@@ -23,6 +23,7 @@ from market_sentinel_ai.regime import VolatilityRegimeDetector
 from market_sentinel_ai.releases import CURRENT_RELEASE, RELEASE_PLAN
 from market_sentinel_ai.signals import SignalEngine
 from market_sentinel_ai.storage import SQLiteCandleRepository, sqlite_path_from_url
+from market_sentinel_ai.reasoning import AstraCostPolicy, AstraReasoningProvider, ReasoningCache, ReasoningGateway
 
 
 def main() -> None:
@@ -68,6 +69,11 @@ def main() -> None:
     ensemble.add_argument("--timeframe", choices=[item.value for item in Timeframe], default="5m")
     ensemble.add_argument("--days", type=int, default=20)
 
+    astra = subparsers.add_parser("astra-context-demo")
+    astra.add_argument("--symbol", default="SPY")
+    astra.add_argument("--timeframe", choices=[item.value for item in Timeframe], default="5m")
+    astra.add_argument("--days", type=int, default=10)
+
     args = parser.parse_args()
     command = args.command or "status"
     settings = Settings.from_env()
@@ -100,6 +106,9 @@ def main() -> None:
         return
     if command == "ensemble-demo":
         _ensemble_demo(args.symbol, Timeframe(args.timeframe), args.days)
+        return
+    if command == "astra-context-demo":
+        _astra_context_demo(settings, args.symbol, Timeframe(args.timeframe), args.days)
         return
     parser.error(f"unknown command: {command}")
 
@@ -331,6 +340,38 @@ def _ensemble_demo(symbol: str, timeframe: Timeframe, days: int) -> None:
                 "source_candles": len(candles),
                 "fifteen_minute_candles": len(higher_timeframe),
                 "latest_order_flow": order_flow_rows[-1].values if order_flow_rows else {},
+            },
+            indent=2,
+            sort_keys=True,
+        )
+    )
+
+
+def _astra_context_demo(settings: Settings, symbol: str, timeframe: Timeframe, days: int) -> None:
+    signal = _demo_signal(settings, symbol, timeframe, days)
+    gateway = ReasoningGateway(
+        provider=AstraReasoningProvider(settings.openai, ReasoningCache()),
+        policy=AstraCostPolicy(
+            min_confidence=settings.openai.min_signal_confidence,
+            max_requests_per_day=settings.openai.max_context_requests_per_day,
+        ),
+    )
+    context = {
+        "sources": ["demo-market-data", "demo-order-flow"],
+        "note": "R6 demo context; live news adapters are intentionally behind interfaces.",
+    }
+    reasoning = gateway.maybe_explain(signal, context)
+    print(
+        json.dumps(
+            {
+                "signal_direction": signal.prediction.direction.value,
+                "signal_confidence": signal.confidence,
+                "astra_requested": reasoning is not None,
+                "astra_enabled": settings.openai.enabled,
+                "thesis": reasoning.thesis if reasoning else None,
+                "invalidation": reasoning.invalidation if reasoning else None,
+                "risk_notes": list(reasoning.risk_notes) if reasoning else [],
+                "context_sources": list(reasoning.context_sources) if reasoning else [],
             },
             indent=2,
             sort_keys=True,

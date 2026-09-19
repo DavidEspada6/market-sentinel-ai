@@ -4,6 +4,16 @@ All notable changes to Market Sentinel AI will be documented in this file.
 
 The project follows semantic versioning once v1.0.0 is reached. Pre-1.0 releases map to the staged roadmap.
 
+## [0.7.0] - 2026-09-19
+
+### Added
+
+- Added GPT-6 Astra reasoning provider using Responses API structured-output shape.
+- Added reasoning cache and gated reasoning gateway.
+- Added static news/context provider interface.
+- Added Astra context demo CLI command with no-key fallback behavior.
+- Added Astra documentation and tests for schema, cache and no-key fallback.
+
 ## [0.6.0] - 2026-09-19
 
 ### Added

@@ -2,7 +2,7 @@
 
 Market Sentinel AI is a predictive market analysis and alerting application. Its core loop is quantitative, cheap and deterministic: market data ingestion, feature engineering, supervised models, walk-forward backtesting, risk controls and alerting. GPT-6 Astra is reserved for contextual reasoning when a signal is important enough to justify the extra cost.
 
-This repository is being built in releases. R5 is the current local release: architecture, contracts, safe configuration, tests, CI, deterministic demo data, SQLite storage, OHLCV/order-flow features, baseline/backtesting, supervised walk-forward evaluation, signal generation, dry-run alerts, a generated web dashboard, regime detection and a weighted ensemble. It intentionally does not place live trades.
+This repository is being built in releases. R6 is the current local release: architecture, contracts, safe configuration, tests, CI, deterministic demo data, SQLite storage, OHLCV/order-flow features, baseline/backtesting, supervised walk-forward evaluation, signal generation, dry-run alerts, dashboard, regime detection, weighted ensemble and gated GPT-6 Astra contextual reasoning. It intentionally does not place live trades.
 
 ## Safety Position
 
@@ -44,6 +44,7 @@ python -m market_sentinel_ai walk-forward-demo --symbol SPY --timeframe 5m --day
 python -m market_sentinel_ai signals-demo --symbol SPY --timeframe 5m --days 10
 python -m market_sentinel_ai dashboard-demo --symbol SPY --timeframe 5m --days 30 --output reports/dashboard.html
 python -m market_sentinel_ai ensemble-demo --symbol SPY --timeframe 5m --days 20
+python -m market_sentinel_ai astra-context-demo --symbol SPY --timeframe 5m --days 10
 ```
 
 The project currently has no required runtime dependencies. Optional extras will be introduced behind stable interfaces as releases need API, ML and OpenAI functionality.
@@ -71,6 +72,7 @@ Market data providers
 ```
 
 Read [docs/architecture.md](docs/architecture.md) for the module boundaries and [docs/risk.md](docs/risk.md) for trading-safety rules.
+Read [docs/astra.md](docs/astra.md) for the R6 GPT-6 Astra integration rules.
 
 ## Why Astra Is Not the Continuous Predictor
 
