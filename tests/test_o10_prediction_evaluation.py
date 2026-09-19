@@ -53,7 +53,7 @@ class PredictionEvaluationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             database = Path(directory) / "market.sqlite3"
             repository = SQLiteCandleRepository(database)
-            now = datetime.now(tz=UTC).replace(second=0, microsecond=0)
+            now = datetime(2026, 9, 18, 15, 0, tzinfo=UTC)
             candles = [
                 Candle(
                     symbol="AAPL",
@@ -89,7 +89,7 @@ class PredictionEvaluationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             database = Path(directory) / "market.sqlite3"
             repository = SQLiteCandleRepository(database)
-            now = datetime.now(tz=UTC).replace(second=0, microsecond=0)
+            now = datetime(2026, 9, 18, 15, 0, tzinfo=UTC)
             repository.record_prediction(_evaluation(now))
             repository.resolve_prediction(
                 "prediction-1",
@@ -114,6 +114,34 @@ class PredictionEvaluationTests(unittest.TestCase):
             self.assertEqual(response.status_code, 200)
             self.assertEqual(response.json()["accuracy_pct"], 100.0)
             self.assertEqual(response.json()["best_window"], "1m")
+
+    def test_monitor_skips_exchange_assets_on_weekends(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            database = Path(directory) / "market.sqlite3"
+            repository = SQLiteCandleRepository(database)
+            saturday = datetime(2026, 9, 19, 15, 0, tzinfo=UTC)
+            repository.upsert_many(
+                [
+                    Candle(
+                        symbol="AAPL",
+                        timeframe=Timeframe.ONE_MINUTE,
+                        opened_at=saturday - timedelta(minutes=20 - index),
+                        open=100.0 + index,
+                        high=100.1 + index,
+                        low=99.9 + index,
+                        close=100.0 + index,
+                        volume=100_000,
+                    )
+                    for index in range(20)
+                ]
+            )
+            settings = replace(Settings.from_env(), database_url=f"sqlite:///{database}")
+            service = MarketScanService(settings, repository=repository, provider=EmptyProvider())
+
+            result = PredictionMonitor(service).run_once(now=saturday)
+
+            self.assertEqual(result.generated, 0)
+            self.assertEqual(repository.list_predictions(), [])
 
     def test_simulation_trade_keeps_cost_and_leverage_details(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

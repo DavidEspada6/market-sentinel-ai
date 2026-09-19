@@ -14,7 +14,7 @@ releases make it a practical daily analysis tool while keeping paper trading as 
 | O7 | 2.7.4 | Complete | Complete UI control center for scanning, paper metrics and diagnostics |
 | O8 | 2.8.2 | Complete | Adaptive predictions, directional watchlist zones and interactive chart inspection |
 | O9 | 2.9.3 | Complete | Leveraged simulation, per-product explanations and horizon-aware recalculation |
-| O10 | 2.10.0 | Current | Continuous prediction evaluation, accuracy analytics and detailed simulation history |
+| O10 | 2.10.1 | Current | Continuous prediction evaluation, accuracy analytics, session-aware scheduling and detailed simulation history |
 | O11 | 3.0.0 | Optional | Broker integration only after explicit approval and a separate security review |
 
 ## What "operational" means

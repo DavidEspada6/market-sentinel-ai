@@ -7,7 +7,7 @@ from threading import Event, Lock
 
 from market_sentinel_ai.adapters.market_data import MarketDataProviderError
 from market_sentinel_ai.analytics.chart import ChartWindowSpec, chart_window_specs
-from market_sentinel_ai.domain.instruments import Instrument
+from market_sentinel_ai.domain.instruments import AssetClass, Instrument
 from market_sentinel_ai.domain.market import Candle, Timeframe
 from market_sentinel_ai.domain.operations import PredictionEvaluation
 from market_sentinel_ai.domain.prediction import Direction
@@ -64,6 +64,8 @@ class PredictionMonitor:
                     grouped_specs[spec.timeframe].append(spec)
 
             for instrument in instruments:
+                if not _market_session_open(instrument, started_at):
+                    continue
                 for timeframe, specs in grouped_specs.items():
                     try:
                         candles = self._load_candles(instrument, timeframe, specs, started_at)
@@ -268,6 +270,13 @@ def _prediction_is_correct(
     if direction is Direction.SHORT:
         return actual_return_bps < -threshold
     return abs(actual_return_bps) <= threshold
+
+
+def _market_session_open(instrument: Instrument, timestamp: datetime) -> bool:
+    """Avoid weekend forecasts for exchange-traded assets; crypto runs 24/7."""
+    if instrument.asset_class is AssetClass.CRYPTO:
+        return True
+    return timestamp.weekday() < 5
 
 
 def _monitor_lookback(timeframe: Timeframe, specs: list[ChartWindowSpec]) -> timedelta:

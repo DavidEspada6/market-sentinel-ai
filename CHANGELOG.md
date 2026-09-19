@@ -4,6 +4,15 @@ All notable changes to Market Sentinel AI will be documented in this file.
 
 The project follows semantic versioning once v1.0.0 is reached. Pre-1.0 releases map to the staged roadmap.
 
+## [2.10.1] - 2026-09-19
+
+### Fixed
+
+- Paused automatic prediction generation for exchange-traded watchlist assets on Saturdays and
+  Sundays while keeping crypto monitoring active 24/7.
+- Kept Friday predictions pending until a real subsequent market candle is available instead of
+  scoring a weekend with synthetic or missing prices.
+
 ## [2.10.0] - 2026-09-19
 
 ### Added

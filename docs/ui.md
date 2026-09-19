@@ -63,6 +63,9 @@ externamente tienen prioridad sobre `.env`.
   PnL y motivo de cierre. El monitor automático se ejecuta en segundo plano cada 30 segundos y
   evita duplicar una predicción para la misma vela; una predicción nueva aparece al llegar una vela
   nueva del timeframe correspondiente.
+- Los sábados y domingos el monitor pausa acciones, ETFs, índices, divisas y materias primas;
+  las criptomonedas continúan al estar disponibles 24/7. Las predicciones del viernes esperan a
+  la primera vela real posterior para poder medirse correctamente.
 - La dirección central es la lectura del modelo para el horizonte elegido. La banda futura superior
   e inferior es un rango aproximado calculado con ATR y momentum, no una segunda predicción
   contraria. No es una prediccion garantizada, asesoramiento financiero ni una orden automatica.
