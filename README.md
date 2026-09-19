@@ -2,7 +2,7 @@
 
 Market Sentinel AI is a predictive market analysis and alerting application. Its core loop is quantitative, cheap and deterministic: market data ingestion, feature engineering, supervised models, walk-forward backtesting, risk controls and alerting. GPT-6 Astra is reserved for contextual reasoning when a signal is important enough to justify the extra cost.
 
-Market Sentinel AI v2.5.0 is the operational alerting and paper-trading market analysis application. It includes deterministic demo data, replaceable Yahoo Finance, Stooq and Alpha Vantage market-data adapters, provider-backed Yahoo instrument search, a public Binance order-book adapter, RSS/Atom news context, quality-gated SQLite ingestion, causal OHLCV/volatility features, causal multitimeframe alignment, trainable XGBoost and LightGBM models, purged walk-forward evaluation, cost-aware backtesting, persistent operational signals with entry/stop/target plans, paper risk analytics for estimated/realized PnL, VaR/CVaR, volatility, Sharpe, Sortino and drawdown, a local API and dashboard, scheduled scans with alert deduplication, a curated multi-asset universe, searchable persistent watchlists with provider metadata, dry-run/webhook alerts, order-flow features, regime-aware ensembles, gated and budget-audited GPT-6 Astra contextual reasoning, persistent paper accounts and trades, drift and health history, recovery backups, operational logs, a repository security gate and end-to-end release tests. It does not place live trades.
+Market Sentinel AI v2.6.0 is the operational alerting and paper-trading market analysis application. It includes deterministic demo data, replaceable Yahoo Finance, Stooq and Alpha Vantage market-data adapters, provider-backed Yahoo instrument search, a public Binance order-book adapter, RSS/Atom news context, quality-gated SQLite ingestion, causal OHLCV/volatility features, causal multitimeframe alignment, trainable XGBoost and LightGBM models, purged walk-forward evaluation, cost-aware backtesting, persistent operational signals with entry/stop/target plans, paper risk analytics for estimated/realized PnL, VaR/CVaR, volatility, Sharpe, Sortino and drawdown, a local API and dashboard, scheduled scans with alert deduplication, a curated multi-asset universe, searchable persistent watchlists with provider metadata, interactive color charts with selectable time windows and approximate future envelopes, dry-run/webhook alerts, order-flow features, regime-aware ensembles, gated and budget-audited GPT-6 Astra contextual reasoning, persistent paper accounts and trades, drift and health history, recovery backups, operational logs, a repository security gate and end-to-end release tests. It does not place live trades.
 
 ## Safety Position
 
@@ -68,6 +68,11 @@ python -m market_sentinel_ai scan --symbol SPY --timeframe 5m --days 5
 python -m market_sentinel_ai schedule --symbols SPY,QQQ --timeframe 5m --once
 python -m market_sentinel_ai serve --host 127.0.0.1 --port 8000
 ```
+
+For the visual workspace, after installing the API extra, double-click `Open-Market-Sentinel.bat`.
+It starts the local dashboard and opens [http://127.0.0.1:8000](http://127.0.0.1:8000). See
+[docs/ui.md](docs/ui.md) for the watchlist, chart filters and the approximate future scenario
+display.
 
 Yahoo Finance and Stooq need no API key. Stooq may require browser verification in some regions, so Yahoo is the primary no-key adapter. Alpha Vantage uses `MARKET_DATA_API_KEY`; select it with `MARKET_DATA_PROVIDER=alpha_vantage`. Provider URLs and polling intervals can be overridden without changing application code. Optional ML, API and OpenAI dependencies remain behind extras.
 

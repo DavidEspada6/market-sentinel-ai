@@ -169,6 +169,15 @@ FOLLOW_ON_PLAN: tuple[Release, ...] = (
     ),
     Release(
         code="O6",
+        version="2.6.0",
+        title="Interactive Market UI And Charting",
+        objective=(
+            "Add a local visual market workspace with clickable watchlist assets, searchable "
+            "time windows, historical charts, advisory forecast envelopes and risk levels."
+        ),
+    ),
+    Release(
+        code="O7",
         version="3.0.0",
         title="Optional Broker Integration Review",
         objective=(
@@ -178,4 +187,4 @@ FOLLOW_ON_PLAN: tuple[Release, ...] = (
     ),
 )
 
-CURRENT_RELEASE = FOLLOW_ON_PLAN[4]
+CURRENT_RELEASE = FOLLOW_ON_PLAN[5]

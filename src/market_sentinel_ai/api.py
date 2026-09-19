@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import HTMLResponse
@@ -10,7 +10,11 @@ from market_sentinel_ai.adapters.market_data import (
     MarketDataProviderError,
     build_instrument_search_provider,
 )
-from market_sentinel_ai.analytics import calculate_risk_metrics
+from market_sentinel_ai.analytics import (
+    build_market_chart_payload,
+    calculate_risk_metrics,
+    chart_window_spec,
+)
 from market_sentinel_ai.config import Settings
 from market_sentinel_ai.dashboard import render_operational_dashboard
 from market_sentinel_ai.domain.instruments import (
@@ -21,10 +25,13 @@ from market_sentinel_ai.domain.instruments import (
     search_instruments,
 )
 from market_sentinel_ai.domain.market import Timeframe
+from market_sentinel_ai.features import OHLCVFeatureEngine
+from market_sentinel_ai.models import MomentumBaselineModel
 from market_sentinel_ai.monitoring import HealthService
 from market_sentinel_ai.operations import MarketScanService, MarketScheduler
 from market_sentinel_ai.reasoning import AstraUsageLedger
 from market_sentinel_ai.releases import CURRENT_RELEASE
+from market_sentinel_ai.signals import SignalEngine, build_trade_plan
 from market_sentinel_ai.storage import SQLiteCandleRepository
 
 
@@ -152,6 +159,97 @@ def create_app(
     @app.get("/api/v1/watchlist")
     def watchlist() -> list[dict[str, object]]:
         return [item.to_dict() for item in repository.list_watchlist()]
+
+    @app.get("/api/v1/market/{symbol:path}")
+    def market_chart(symbol: str, window: str = "1d") -> dict[str, object]:
+        try:
+            normalized = custom_instrument(symbol).symbol
+            spec = chart_window_spec(window)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+        selected = next(
+            (item for item in repository.list_watchlist() if item.symbol == normalized),
+            None,
+        )
+        selected = selected or find_instrument(normalized) or custom_instrument(normalized)
+        market_symbol = selected.market_symbol
+        end = datetime.now(tz=UTC).replace(second=0, microsecond=0)
+        start = end - (spec.lookback or timedelta(days=3650))
+        candles = []
+        source = "cache"
+
+        try:
+            fetched = list(
+                active_service.provider.historical_candles(
+                    market_symbol,
+                    spec.timeframe,
+                    start,
+                    end,
+                )
+            )
+            candles = sorted(
+                [
+                    candle
+                    for candle in fetched
+                    if start <= candle.opened_at < end
+                ],
+                key=lambda candle: candle.opened_at,
+            )
+            if candles:
+                repository.upsert_many(candles)
+                source = "provider"
+        except (MarketDataProviderError, OSError, ValueError):
+            candles = []
+
+        if not candles:
+            candles = repository.list_candles(market_symbol, spec.timeframe, start, end)
+        if not candles and market_symbol != normalized:
+            candles = repository.list_candles(normalized, spec.timeframe, start, end)
+        if not candles:
+            raise HTTPException(
+                status_code=404,
+                detail=(
+                    f"no market candles available for {normalized} in {spec.label}; "
+                    "check the provider or run an ingestion scan"
+                ),
+            )
+
+        features = OHLCVFeatureEngine().transform(candles)
+        horizon_minutes = {
+            Timeframe.ONE_MINUTE: 1,
+            Timeframe.FIVE_MINUTES: 5,
+            Timeframe.FIFTEEN_MINUTES: 15,
+            Timeframe.ONE_HOUR: 60,
+            Timeframe.ONE_DAY: 1440,
+        }[spec.timeframe]
+        prediction = MomentumBaselineModel(horizon_minutes=horizon_minutes).predict(features)
+        round_trip_cost_bps = (
+            active_settings.risk.default_fee_bps * 2
+            + active_settings.risk.default_slippage_bps * 2
+            + active_settings.risk.default_spread_bps
+        )
+        signal = SignalEngine(
+            min_probability=0.55,
+            min_expected_return_bps=round_trip_cost_bps,
+        ).from_prediction(prediction)
+        plan = build_trade_plan(
+            signal,
+            candles[-1],
+            features[-1],
+            spec.timeframe,
+            round_trip_cost_bps,
+        )
+        return build_market_chart_payload(
+            candles,
+            signal,
+            plan,
+            features[-1],
+            instrument=selected.to_dict(),
+            spec=spec,
+            provider=getattr(active_service.provider, "provider_name", "unknown"),
+            source=source,
+        )
 
     @app.post("/api/v1/watchlist")
     def add_watchlist_item(request: WatchlistRequest) -> dict[str, object]:

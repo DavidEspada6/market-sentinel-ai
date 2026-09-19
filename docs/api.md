@@ -25,6 +25,9 @@ The default binding is local-only. The service does not place real orders.
 - GET /api/v1/watchlist lists the persistent watchlist.
 - POST /api/v1/watchlist adds a known or custom provider symbol.
 - DELETE /api/v1/watchlist/{symbol} disables a watchlist entry.
+- GET /api/v1/market/{symbol}?window=1d returns historical candles, signal context, risk levels
+  and an approximate ATR/momentum future envelope. Supported windows are `1m`, `5m`, `30m`,
+  `1h`, `6h`, `12h`, `1d`, `1w`, `1mo`, `3mo`, `6mo`, `1y`, `3y` and `total`.
 - POST /api/v1/watchlist/scan scans every enabled watchlist instrument once and persists the
   scheduler run and resulting signals.
 - GET /api/v1/astra-usage lists today's request, cache, token and estimated-cost counters.
@@ -63,3 +66,5 @@ python -m market_sentinel_ai watchlist-scan --timeframe 5m --interval-seconds 30
 Alerts stay in dry-run mode by default. A configured webhook is used only when
 \`ALERTS_DRY_RUN=false\` and \`ALERT_WEBHOOK_URL\` is present. No broker or order-execution adapter
 exists in this completion track.
+
+For the visual workspace, see [docs/ui.md](ui.md).

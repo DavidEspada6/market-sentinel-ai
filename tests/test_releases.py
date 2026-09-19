@@ -28,8 +28,8 @@ class ReleasePlanTests(unittest.TestCase):
     def test_follow_on_plan_and_current_release(self) -> None:
         self.assertEqual(FOLLOW_ON_PLAN[0].code, "O1")
         self.assertEqual(FOLLOW_ON_PLAN[-1].version, "3.0.0")
-        self.assertEqual(CURRENT_RELEASE.code, "O5")
-        self.assertEqual(CURRENT_RELEASE.version, "2.5.0")
+        self.assertEqual(CURRENT_RELEASE.code, "O6")
+        self.assertEqual(CURRENT_RELEASE.version, "2.6.0")
         self.assertEqual(version("market-sentinel-ai"), CURRENT_RELEASE.version)
 
 

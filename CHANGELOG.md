@@ -4,6 +4,22 @@ All notable changes to Market Sentinel AI will be documented in this file.
 
 The project follows semantic versioning once v1.0.0 is reached. Pre-1.0 releases map to the staged roadmap.
 
+## [2.6.0] - 2026-09-19
+
+### Added
+
+- Added an interactive local market workspace with clickable watchlist assets.
+- Added chart filters for 1 minute through 3 years and the available total history.
+- Added historical OHLCV charts, approximate ATR/momentum future envelopes, entry, stop and
+  target levels, and a visible non-guaranteed forecast disclaimer.
+- Added `Open-Market-Sentinel.bat` and `Open-Market-Sentinel.ps1` for simple local startup.
+- Added chart API and dashboard contract tests.
+
+### Changed
+
+- Promoted the operational product track to O6 `2.6.0`.
+- Renamed the optional broker review to O7 `3.0.0` so it remains outside the non-executing app.
+
 ## [2.5.0] - 2026-09-19
 
 ### Added
