@@ -1,9 +1,8 @@
 # Operations
 
-The original v1.0.0 was a prototype baseline. The completion track ends at v2.0.0, which adds
-the integrated security gate and end-to-end release checks on top of persistent paper state,
-drift history, health checks and database backup while preserving alert-only and paper-trading
-boundaries.
+The original v1.0.0 was a prototype baseline. The completion track ended at v2.0.0; O1 adds a
+curated multi-asset universe, persistent watchlists and controlled periodic scans while
+preserving alert-only and paper-trading boundaries.
 
 ## Supported Mode
 
@@ -33,6 +32,8 @@ boundaries.
 - Persistent paper accounts and simulated trades with restart recovery.
 - SQLite integrity checks, health history and backup support.
 - Repository security check and final end-to-end release test.
+- Curated instrument universe and persistent watchlist.
+- Search, add/remove and multi-symbol watchlist scanning from the local API and dashboard.
 
 ## Not Supported In v2.0.0
 

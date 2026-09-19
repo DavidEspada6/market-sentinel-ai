@@ -8,9 +8,15 @@ from pydantic import BaseModel, Field
 
 from market_sentinel_ai.config import Settings
 from market_sentinel_ai.dashboard import render_operational_dashboard
+from market_sentinel_ai.domain.instruments import (
+    AssetClass,
+    custom_instrument,
+    find_instrument,
+    search_instruments,
+)
 from market_sentinel_ai.domain.market import Timeframe
 from market_sentinel_ai.monitoring import HealthService
-from market_sentinel_ai.operations import MarketScanService
+from market_sentinel_ai.operations import MarketScanService, MarketScheduler
 from market_sentinel_ai.reasoning import AstraUsageLedger
 from market_sentinel_ai.releases import CURRENT_RELEASE
 from market_sentinel_ai.storage import SQLiteCandleRepository
@@ -18,6 +24,15 @@ from market_sentinel_ai.storage import SQLiteCandleRepository
 
 class ScanRequest(BaseModel):
     symbol: str = Field(min_length=1, max_length=20)
+    timeframe: str = "5m"
+    days: int = Field(default=5, gt=0, le=3650)
+
+
+class WatchlistRequest(BaseModel):
+    symbol: str = Field(min_length=1, max_length=24)
+
+
+class WatchlistScanRequest(BaseModel):
     timeframe: str = "5m"
     days: int = Field(default=5, gt=0, le=3650)
 
@@ -77,6 +92,52 @@ def create_app(
     @app.get("/api/v1/runs")
     def runs(limit: int = Query(default=20, ge=1, le=200)) -> list[dict[str, object]]:
         return [run.to_dict() for run in repository.list_scheduler_runs(limit)]
+
+    @app.get("/api/v1/instruments")
+    def instruments(
+        q: str = "",
+        asset_class: str | None = None,
+        limit: int = Query(default=50, ge=1, le=200),
+    ) -> list[dict[str, object]]:
+        try:
+            selected_class = AssetClass(asset_class) if asset_class else None
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail="unsupported asset class") from exc
+        return [item.to_dict() for item in search_instruments(q, selected_class, limit)]
+
+    @app.get("/api/v1/watchlist")
+    def watchlist() -> list[dict[str, object]]:
+        return [item.to_dict() for item in repository.list_watchlist()]
+
+    @app.post("/api/v1/watchlist")
+    def add_watchlist_item(request: WatchlistRequest) -> dict[str, object]:
+        try:
+            instrument = find_instrument(request.symbol) or custom_instrument(request.symbol)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        return repository.add_watchlist_item(instrument).to_dict()
+
+    @app.delete("/api/v1/watchlist/{symbol}")
+    def remove_watchlist_item(symbol: str) -> dict[str, object]:
+        try:
+            normalized = custom_instrument(symbol).symbol
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        if not repository.remove_watchlist_item(normalized):
+            raise HTTPException(status_code=404, detail="instrument not in watchlist")
+        return {"symbol": normalized, "removed": True}
+
+    @app.post("/api/v1/watchlist/scan")
+    def scan_watchlist(request: WatchlistScanRequest) -> dict[str, object]:
+        try:
+            timeframe = Timeframe(request.timeframe)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail="unsupported timeframe") from exc
+        symbols = tuple(item.market_symbol for item in repository.list_watchlist())
+        if not symbols:
+            raise HTTPException(status_code=422, detail="watchlist is empty")
+        result = MarketScheduler(active_service).run_once(symbols, timeframe, request.days)
+        return result.to_dict()
 
     @app.get("/api/v1/astra-usage")
     def astra_usage() -> dict[str, object]:
@@ -154,6 +215,7 @@ def create_app(
             repository.list_alerts(limit=50),
             generated_at_iso=datetime.now(tz=UTC).isoformat(),
             environment=active_settings.environment,
+            watchlist=repository.list_watchlist(),
         )
 
     return app

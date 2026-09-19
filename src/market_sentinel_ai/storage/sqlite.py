@@ -9,6 +9,7 @@ from pathlib import Path
 from uuid import uuid4
 
 from market_sentinel_ai.domain.ingestion import IngestionRun
+from market_sentinel_ai.domain.instruments import AssetClass, Instrument, featured_instruments
 from market_sentinel_ai.domain.market import Candle, Timeframe
 from market_sentinel_ai.domain.operations import AlertRecord, SchedulerRunRecord, SignalRecord
 from market_sentinel_ai.domain.paper import (
@@ -147,6 +148,21 @@ CREATE TABLE IF NOT EXISTS health_checks (
 
 CREATE INDEX IF NOT EXISTS idx_health_checks_created_at
 ON health_checks(created_at DESC);
+
+CREATE TABLE IF NOT EXISTS watchlist (
+    symbol TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    asset_class TEXT NOT NULL,
+    exchange TEXT NOT NULL,
+    currency TEXT NOT NULL,
+    provider_symbol TEXT NOT NULL,
+    featured INTEGER NOT NULL DEFAULT 0,
+    enabled INTEGER NOT NULL DEFAULT 1,
+    added_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_watchlist_enabled_symbol
+ON watchlist(enabled, symbol);
 """
 
 
@@ -444,6 +460,69 @@ class SQLiteCandleRepository:
             for row in rows
         ]
 
+    def add_watchlist_item(self, instrument: Instrument) -> Instrument:
+        now = datetime.now(tz=UTC).isoformat()
+        with closing(self._connect()) as connection, connection:
+            connection.execute(
+                """
+                INSERT INTO watchlist (
+                    symbol, name, asset_class, exchange, currency, provider_symbol,
+                    featured, enabled, added_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)
+                ON CONFLICT(symbol) DO UPDATE SET
+                    name = excluded.name,
+                    asset_class = excluded.asset_class,
+                    exchange = excluded.exchange,
+                    currency = excluded.currency,
+                    provider_symbol = excluded.provider_symbol,
+                    featured = excluded.featured,
+                    enabled = 1
+                """,
+                (
+                    instrument.symbol,
+                    instrument.name,
+                    instrument.asset_class.value,
+                    instrument.exchange,
+                    instrument.currency,
+                    instrument.market_symbol,
+                    int(instrument.featured),
+                    now,
+                ),
+            )
+        return instrument
+
+    def remove_watchlist_item(self, symbol: str) -> bool:
+        with closing(self._connect()) as connection, connection:
+            cursor = connection.execute(
+                "UPDATE watchlist SET enabled = 0 WHERE symbol = ? AND enabled = 1",
+                (symbol.upper(),),
+            )
+        return cursor.rowcount > 0
+
+    def list_watchlist(self, enabled_only: bool = True) -> list[Instrument]:
+        where = "WHERE enabled = 1" if enabled_only else ""
+        with closing(self._connect()) as connection:
+            rows = connection.execute(
+                f"""
+                SELECT symbol, name, asset_class, exchange, currency, provider_symbol, featured
+                FROM watchlist
+                {where}
+                ORDER BY symbol ASC
+                """
+            ).fetchall()
+        return [
+            Instrument(
+                symbol=row["symbol"],
+                name=row["name"],
+                asset_class=AssetClass(row["asset_class"]),
+                exchange=row["exchange"],
+                currency=row["currency"],
+                provider_symbol=row["provider_symbol"],
+                featured=bool(row["featured"]),
+            )
+            for row in rows
+        ]
+
     def load_paper_account(self, account_id: str) -> PaperAccountSnapshot | None:
         with closing(self._connect()) as connection:
             row = connection.execute(
@@ -667,6 +746,26 @@ class SQLiteCandleRepository:
     def _ensure_schema(self) -> None:
         with closing(self._connect()) as connection, connection:
             connection.executescript(SCHEMA)
+            if connection.execute("SELECT COUNT(*) FROM watchlist").fetchone()[0] == 0:
+                for instrument in featured_instruments():
+                    connection.execute(
+                        """
+                        INSERT INTO watchlist (
+                            symbol, name, asset_class, exchange, currency, provider_symbol,
+                            featured, enabled, added_at
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)
+                        """,
+                        (
+                            instrument.symbol,
+                            instrument.name,
+                            instrument.asset_class.value,
+                            instrument.exchange,
+                            instrument.currency,
+                            instrument.market_symbol,
+                            int(instrument.featured),
+                            datetime.now(tz=UTC).isoformat(),
+                        ),
+                    )
 
     def _connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(self.database_path)

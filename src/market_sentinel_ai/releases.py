@@ -121,4 +121,61 @@ COMPLETION_PLAN: tuple[Release, ...] = (
     ),
 )
 
-CURRENT_RELEASE = COMPLETION_PLAN[6]
+FOLLOW_ON_PLAN: tuple[Release, ...] = (
+    Release(
+        code="O1",
+        version="2.1.0",
+        title="Known Asset Universe And Periodic Scanning",
+        objective=(
+            "Scan a curated universe of liquid, well-known instruments, persist a watchlist "
+            "and run controlled periodic scans through the configured provider."
+        ),
+    ),
+    Release(
+        code="O2",
+        version="2.2.0",
+        title="Provider Search And Watchlist UX",
+        objective=(
+            "Add provider-backed symbol search, instrument metadata and a complete watchlist "
+            "workflow for adding user-selected products."
+        ),
+    ),
+    Release(
+        code="O3",
+        version="2.3.0",
+        title="Entry And Exit Signal Lifecycle",
+        objective=(
+            "Track signal state, entry zones, invalidation, take-profit and exit conditions "
+            "with deduplicated alerts."
+        ),
+    ),
+    Release(
+        code="O4",
+        version="2.4.0",
+        title="Portfolio Risk And Performance Analytics",
+        objective=(
+            "Add estimated and realized PnL, VaR, CVaR, volatility, exposure, drawdown, "
+            "Sharpe, Sortino, expectancy and calibration metrics."
+        ),
+    ),
+    Release(
+        code="O5",
+        version="2.5.0",
+        title="Operational Product Release",
+        objective=(
+            "Harden scheduling, dashboards, notifications, data quality, observability and "
+            "deployment for continuous alerting and paper operations."
+        ),
+    ),
+    Release(
+        code="O6",
+        version="3.0.0",
+        title="Optional Broker Integration Review",
+        objective=(
+            "Only if explicitly requested: add a separately gated broker adapter after a "
+            "security review, paper track record and manual approval workflow."
+        ),
+    ),
+)
+
+CURRENT_RELEASE = FOLLOW_ON_PLAN[0]

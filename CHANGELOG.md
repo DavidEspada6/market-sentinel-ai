@@ -4,6 +4,22 @@ All notable changes to Market Sentinel AI will be documented in this file.
 
 The project follows semantic versioning once v1.0.0 is reached. Pre-1.0 releases map to the staged roadmap.
 
+## [2.1.0] - 2026-09-19
+
+### Added
+
+- Added a curated instrument universe covering equities, ETFs, crypto, commodities, FX and indices.
+- Added a persistent SQLite watchlist seeded with featured liquid instruments.
+- Added API search, add/remove watchlist and controlled watchlist-scan endpoints.
+- Added CLI commands for instrument search, watchlist management and periodic watchlist scans.
+- Added dashboard search, add/remove controls and a scan-now action.
+- Added O1 coverage for catalog search, persistence, dashboard integration and multi-symbol scans.
+
+### Changed
+
+- Started the operational product track at O1 with version `2.1.0`.
+- Kept all scans alert-only and paper-trading-only; real orders remain disabled.
+
 ## [2.0.0] - 2026-09-19
 
 ### Added

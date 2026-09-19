@@ -17,6 +17,12 @@ from market_sentinel_ai.backtesting import SimpleBacktestEngine
 from market_sentinel_ai.config import Settings
 from market_sentinel_ai.context import NewsContextBuilder, NewsItem, StaticNewsProvider
 from market_sentinel_ai.dashboard import DashboardViewModel, render_dashboard
+from market_sentinel_ai.domain.instruments import (
+    AssetClass,
+    custom_instrument,
+    find_instrument,
+    search_instruments,
+)
 from market_sentinel_ai.domain.market import Timeframe
 from market_sentinel_ai.domain.risk import RiskLimits
 from market_sentinel_ai.features import (
@@ -46,7 +52,12 @@ from market_sentinel_ai.reasoning import (
     ReasoningGateway,
 )
 from market_sentinel_ai.regime import Regime
-from market_sentinel_ai.releases import COMPLETION_PLAN, CURRENT_RELEASE, RELEASE_PLAN
+from market_sentinel_ai.releases import (
+    COMPLETION_PLAN,
+    CURRENT_RELEASE,
+    FOLLOW_ON_PLAN,
+    RELEASE_PLAN,
+)
 from market_sentinel_ai.security import run_security_checks
 from market_sentinel_ai.signals import SignalEngine
 from market_sentinel_ai.storage import SQLiteCandleRepository, sqlite_path_from_url
@@ -152,6 +163,24 @@ def main() -> None:
 
     subparsers.add_parser("security-check")
 
+    instruments = subparsers.add_parser("instruments")
+    instruments.add_argument("--query", default="")
+    instruments.add_argument("--asset-class", choices=[item.value for item in AssetClass])
+    instruments.add_argument("--limit", type=int, default=50)
+
+    watchlist = subparsers.add_parser("watchlist")
+    watchlist_group = watchlist.add_mutually_exclusive_group()
+    watchlist_group.add_argument("--add")
+    watchlist_group.add_argument("--remove")
+
+    watchlist_scan = subparsers.add_parser("watchlist-scan")
+    watchlist_scan.add_argument(
+        "--timeframe", choices=[item.value for item in Timeframe], default="5m"
+    )
+    watchlist_scan.add_argument("--days", type=int, default=5)
+    watchlist_scan.add_argument("--interval-seconds", type=int, default=60)
+    watchlist_scan.add_argument("--once", action="store_true")
+
     backup = subparsers.add_parser("backup")
     backup.add_argument("--output", default="backups/market_sentinel.sqlite3")
 
@@ -248,6 +277,17 @@ def main() -> None:
     if command == "security-check":
         _security_check()
         return
+    if command == "instruments":
+        _instruments(args.query, args.asset_class, args.limit)
+        return
+    if command == "watchlist":
+        _watchlist(settings, args.add, args.remove)
+        return
+    if command == "watchlist-scan":
+        _watchlist_scan(
+            settings, Timeframe(args.timeframe), args.days, args.interval_seconds, args.once
+        )
+        return
     if command == "backup":
         _backup(settings, args.output)
         return
@@ -280,6 +320,7 @@ def _print_status(settings: Settings) -> None:
         "current_version": CURRENT_RELEASE.version,
         "planned_releases": [release.code for release in RELEASE_PLAN],
         "completion_releases": [release.code for release in COMPLETION_PLAN],
+        "follow_on_releases": [release.code for release in FOLLOW_ON_PLAN],
     }
     print(json.dumps(payload, indent=2, sort_keys=True))
 
@@ -868,6 +909,49 @@ def _security_check() -> None:
     print(json.dumps(report.to_dict(), indent=2, sort_keys=True))
     if report.status != "ok":
         raise SystemExit(1)
+
+
+def _instruments(query: str, asset_class: str | None, limit: int) -> None:
+    selected = AssetClass(asset_class) if asset_class else None
+    print(
+        json.dumps(
+            [item.to_dict() for item in search_instruments(query, selected, limit)], indent=2
+        )
+    )
+
+
+def _watchlist(settings: Settings, add: str | None, remove: str | None) -> None:
+    repository = SQLiteCandleRepository(sqlite_path_from_url(settings.database_url))
+    if add:
+        instrument = find_instrument(add) or custom_instrument(add)
+        repository.add_watchlist_item(instrument)
+    if remove:
+        repository.remove_watchlist_item(custom_instrument(remove).symbol)
+    print(json.dumps([item.to_dict() for item in repository.list_watchlist()], indent=2))
+
+
+def _watchlist_scan(
+    settings: Settings,
+    timeframe: Timeframe,
+    days: int,
+    interval_seconds: int,
+    once: bool,
+) -> None:
+    repository = SQLiteCandleRepository(sqlite_path_from_url(settings.database_url))
+    symbols = tuple(item.market_symbol for item in repository.list_watchlist())
+    if not symbols:
+        raise ValueError("watchlist is empty")
+    scheduler = MarketScheduler(
+        MarketScanService(settings, repository=repository), interval_seconds
+    )
+    if once:
+        print(
+            json.dumps(
+                scheduler.run_once(symbols, timeframe, days).to_dict(), indent=2, default=str
+            )
+        )
+        return
+    scheduler.run_forever(symbols, timeframe, days)
 
 
 def _backup(settings: Settings, output: str) -> None:

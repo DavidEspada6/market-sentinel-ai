@@ -18,6 +18,13 @@ The default binding is local-only. The service does not place real orders.
   \`limit\`.
 - \`GET /api/v1/alerts\` lists persisted alert deliveries.
 - GET /api/v1/runs lists scheduler runs.
+- GET /api/v1/instruments searches the curated instrument universe with optional \`q\`,
+  \`asset_class\` and \`limit\` filters.
+- GET /api/v1/watchlist lists the persistent watchlist.
+- POST /api/v1/watchlist adds a known or custom provider symbol.
+- DELETE /api/v1/watchlist/{symbol} disables a watchlist entry.
+- POST /api/v1/watchlist/scan scans every enabled watchlist instrument once and persists the
+  scheduler run and resulting signals.
 - GET /api/v1/astra-usage lists today's request, cache, token and estimated-cost counters.
 - GET /api/v1/paper/account returns the recovered paper equity state.
 - GET /api/v1/paper/trades lists persisted simulated trades.
@@ -40,6 +47,13 @@ Run the polling loop:
 
 \`\`\`powershell
 python -m market_sentinel_ai schedule --symbols SPY,QQQ --timeframe 5m --interval-seconds 60
+\`\`\`
+
+Scan the persisted watchlist once or continuously:
+
+\`\`\`powershell
+python -m market_sentinel_ai watchlist-scan --once --timeframe 5m --days 5
+python -m market_sentinel_ai watchlist-scan --timeframe 5m --interval-seconds 300
 \`\`\`
 
 Alerts stay in dry-run mode by default. A configured webhook is used only when

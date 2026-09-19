@@ -2,8 +2,9 @@
 
 The original R0-R7 history established the architecture and thin vertical slices, but its
 v1.0.0 tag did not contain every operational integration described by the product brief. The
-published tags remain immutable. This completion track closes the remaining scope through
-reviewable releases and ends at v2.0.0.
+published tags remain immutable. This completion track closed that scope through reviewable
+releases and ended at v2.0.0. The follow-on operational track is documented in
+[operational-roadmap.md](operational-roadmap.md).
 
 | Release | Version | Deliverable |
 | --- | --- | --- |
@@ -15,5 +16,6 @@ reviewable releases and ends at v2.0.0.
 | C6 | 1.6.0 | Persistent paper portfolio, drift monitoring, health and recovery |
 | C7 | 2.0.0 | Integrated packaging, security checks, end-to-end tests and final documentation (current) |
 
-Every release must pass lint and tests, update documentation and changelog, and be published as
-a clean commit, semantic tag and GitHub Release. Real-money execution remains outside this plan.
+Every completion release passed lint and tests, updated documentation and changelog, and was
+published as a clean commit, semantic tag and GitHub Release. Real-money execution remains
+outside this plan.

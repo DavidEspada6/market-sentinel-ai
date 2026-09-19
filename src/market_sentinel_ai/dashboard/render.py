@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from html import escape
 
+from market_sentinel_ai.domain.instruments import Instrument
 from market_sentinel_ai.domain.operations import AlertRecord, SignalRecord
 from market_sentinel_ai.domain.prediction import Signal
 from market_sentinel_ai.ports.backtesting import BacktestReport
@@ -188,12 +189,17 @@ def render_operational_dashboard(
     *,
     generated_at_iso: str,
     environment: str,
+    watchlist: list[Instrument] | None = None,
 ) -> str:
+    watchlist = watchlist or []
     signal_rows = "\n".join(_render_signal_record(signal) for signal in signals) or (
         '<tr><td colspan="6">No persisted signals</td></tr>'
     )
     alert_rows = "\n".join(_render_alert_record(alert) for alert in alerts) or (
         '<tr><td colspan="5">No persisted alerts</td></tr>'
+    )
+    watchlist_rows = "\n".join(_render_instrument_row(item) for item in watchlist) or (
+        '<tr><td colspan="5">Watchlist is empty</td></tr>'
     )
     return f"""<!doctype html>
 <html lang="en">
@@ -214,8 +220,15 @@ def render_operational_dashboard(
     main {{ max-width: 1180px; margin: 0 auto; padding: 24px; }}
     .meta {{ color: var(--muted); font-size: 13px; }}
     .toolbar {{ display: flex; align-items: center; gap: 12px; }}
+    .searchbar {{ display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }}
+    input, select {{ border: 1px solid var(--line); border-radius: 4px; padding: 8px 10px;
+      font: inherit; min-height: 38px; }}
     button {{ background: var(--teal); border: 0; border-radius: 5px; color: #fff; cursor: pointer;
       font: inherit; padding: 8px 12px; }}
+    button.secondary {{ background: #e8eef0; color: var(--ink); }}
+    .search-results {{ display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }}
+    .search-results:empty {{ display: none; }}
+    .status {{ min-height: 20px; color: var(--muted); margin: 8px 0; }}
     section {{ margin-top: 20px; }}
     .panel {{ background: var(--panel); border: 1px solid var(--line); border-radius: 6px;
       padding: 16px; }}
@@ -249,6 +262,27 @@ def render_operational_dashboard(
           str(sum(signal.direction.value != "NO_TRADE" for signal in signals))
       )}
     </div>
+    <section><div class="panel"><h2>Watchlist</h2>
+      <form class="searchbar" id="instrument-search">
+        <input id="instrument-query" type="search" placeholder="Search symbol or name"
+          aria-label="Search symbol or name">
+        <select id="instrument-class" aria-label="Asset class">
+          <option value="">All asset classes</option>
+          <option value="equity">Equities</option>
+          <option value="etf">ETFs</option>
+          <option value="crypto">Crypto</option>
+          <option value="commodity">Commodities</option>
+          <option value="fx">FX</option>
+          <option value="index">Indices</option>
+        </select>
+        <button type="submit">Search</button>
+        <button type="button" class="secondary" id="scan-watchlist">Scan now</button>
+      </form>
+      <div id="instrument-results" class="search-results" aria-live="polite"></div>
+      <div id="watchlist-status" class="status" aria-live="polite"></div>
+      <table><thead><tr><th>Symbol</th><th>Name</th><th>Class</th><th>Exchange</th><th></th></tr>
+      </thead><tbody id="watchlist-rows">{watchlist_rows}</tbody></table>
+    </div></section>
     <section><div class="panel"><h2>Latest signals</h2>
       <table><thead><tr><th>Symbol</th><th>Timeframe</th><th>Direction</th><th>Confidence</th>
         <th>Model</th><th>Generated</th></tr></thead><tbody>{signal_rows}</tbody></table>
@@ -259,6 +293,65 @@ def render_operational_dashboard(
         </tr></thead><tbody>{alert_rows}</tbody></table>
     </div></section>
   </main>
+  <script>
+    const status = document.getElementById('watchlist-status');
+    const results = document.getElementById('instrument-results');
+    const rows = document.getElementById('watchlist-rows');
+    const query = document.getElementById('instrument-query');
+    const assetClass = document.getElementById('instrument-class');
+
+    function setStatus(message) {{ status.textContent = message; }}
+
+    function addSearchButton(item) {{
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'secondary';
+      button.textContent = `Add ${{item.symbol}}`;
+      button.title = `${{item.name}} (${{item.asset_class}})`;
+      button.addEventListener('click', async () => {{
+        const response = await fetch('/api/v1/watchlist', {{
+          method: 'POST', headers: {{'Content-Type': 'application/json'}},
+          body: JSON.stringify({{symbol: item.symbol}})
+        }});
+        setStatus(response.ok ? `${{item.symbol}} added to watchlist` : 'Could not add instrument');
+        if (response.ok) window.location.reload();
+      }});
+      results.appendChild(button);
+    }}
+
+    async function searchInstruments(event) {{
+      if (event) event.preventDefault();
+      const params = new URLSearchParams({{q: query.value, asset_class: assetClass.value}});
+      const response = await fetch(`/api/v1/instruments?${{params}}`);
+      results.replaceChildren();
+      if (!response.ok) {{ setStatus('Search failed'); return; }}
+      const items = await response.json();
+      items.forEach(addSearchButton);
+      setStatus(`${{items.length}} instruments found`);
+    }}
+
+    document.getElementById('instrument-search').addEventListener('submit', searchInstruments);
+    document.querySelectorAll('.remove-instrument').forEach((button) => {{
+      button.addEventListener('click', async () => {{
+        const symbol = button.dataset.symbol;
+        const response = await fetch(
+          `/api/v1/watchlist/${{encodeURIComponent(symbol)}}`, {{method: 'DELETE'}}
+        );
+        setStatus(
+          response.ok ? `${{symbol}} removed from watchlist` : 'Could not remove instrument'
+        );
+        if (response.ok) window.location.reload();
+      }});
+    }});
+    document.getElementById('scan-watchlist').addEventListener('click', async () => {{
+      setStatus('Scanning watchlist...');
+      const response = await fetch('/api/v1/watchlist/scan', {{
+        method: 'POST', headers: {{'Content-Type': 'application/json'}},
+        body: JSON.stringify({{timeframe: '5m', days: 5}})
+      }});
+      setStatus(response.ok ? 'Scan completed; refresh to see new signals' : 'Scan failed');
+    }});
+  </script>
 </body>
 </html>
 """
@@ -293,5 +386,18 @@ def _render_alert_record(alert: AlertRecord) -> str:
         f'<td>{escape(alert.external_id or "-")}</td>'
         f"<td>{escape(alert.created_at.isoformat())}</td>"
         f'<td>{escape(alert.error or "-")}</td>'
+        "</tr>"
+    )
+
+
+def _render_instrument_row(instrument: Instrument) -> str:
+    return (
+        "<tr>"
+        f"<td>{escape(instrument.symbol)}</td>"
+        f"<td>{escape(instrument.name)}</td>"
+        f"<td>{escape(instrument.asset_class.value)}</td>"
+        f"<td>{escape(instrument.exchange)}</td>"
+        f'<td><button type="button" class="secondary remove-instrument" '
+        f'data-symbol="{escape(instrument.symbol)}">Remove</button></td>'
         "</tr>"
     )
