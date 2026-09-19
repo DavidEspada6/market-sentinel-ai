@@ -2,7 +2,7 @@
 
 Market Sentinel AI is a predictive market analysis and alerting application. Its core loop is quantitative, cheap and deterministic: market data ingestion, feature engineering, supervised models, walk-forward backtesting, risk controls and alerting. GPT-6 Astra is reserved for contextual reasoning when a signal is important enough to justify the extra cost.
 
-This repository is being built in releases. R3 is the current local release: architecture, contracts, safe configuration, tests, CI, deterministic demo data, SQLite storage, OHLCV features, baseline/backtesting and supervised walk-forward evaluation. It intentionally does not place live trades.
+This repository is being built in releases. R4 is the current local release: architecture, contracts, safe configuration, tests, CI, deterministic demo data, SQLite storage, OHLCV features, baseline/backtesting, supervised walk-forward evaluation, signal generation, dry-run alerts and a generated web dashboard. It intentionally does not place live trades.
 
 ## Safety Position
 
@@ -41,6 +41,8 @@ python -m market_sentinel_ai demo-ingest --symbol SPY --timeframe 5m --days 3
 python -m market_sentinel_ai list-candles --symbol SPY --timeframe 5m --days 3
 python -m market_sentinel_ai backtest-demo --symbol SPY --timeframe 5m --days 10
 python -m market_sentinel_ai walk-forward-demo --symbol SPY --timeframe 5m --days 30
+python -m market_sentinel_ai signals-demo --symbol SPY --timeframe 5m --days 10
+python -m market_sentinel_ai dashboard-demo --symbol SPY --timeframe 5m --days 30 --output reports/dashboard.html
 ```
 
 The project currently has no required runtime dependencies. Optional extras will be introduced behind stable interfaces as releases need API, ML and OpenAI functionality.

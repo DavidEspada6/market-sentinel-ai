@@ -4,6 +4,16 @@ All notable changes to Market Sentinel AI will be documented in this file.
 
 The project follows semantic versioning once v1.0.0 is reached. Pre-1.0 releases map to the staged roadmap.
 
+## [0.5.0] - 2026-09-19
+
+### Added
+
+- Added signal engine that gates model predictions into LONG/SHORT/NO TRADE alerts.
+- Added dry-run and JSONL alert channels.
+- Added generated local HTML dashboard with backtest metrics, walk-forward snapshot and current signals.
+- Added CLI commands for signal and dashboard demos.
+- Added tests for signal gating, alert delivery and dashboard rendering.
+
 ## [0.4.0] - 2026-09-19
 
 ### Added

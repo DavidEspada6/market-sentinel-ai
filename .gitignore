@@ -21,6 +21,7 @@ build/
 /models/
 /reports/
 /logs/
+/outputs/
 *.sqlite
 *.sqlite3
 *.db

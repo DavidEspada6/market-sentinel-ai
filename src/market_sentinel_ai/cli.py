@@ -3,15 +3,19 @@ from __future__ import annotations
 import argparse
 import json
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 
 from market_sentinel_ai.adapters.market_data import DemoMarketDataProvider
+from market_sentinel_ai.alerts import DryRunAlertChannel
 from market_sentinel_ai.backtesting import SimpleBacktestEngine
 from market_sentinel_ai.config import Settings
+from market_sentinel_ai.dashboard import DashboardViewModel, render_dashboard
 from market_sentinel_ai.domain.market import Timeframe
 from market_sentinel_ai.features import OHLCVFeatureEngine
 from market_sentinel_ai.ml import WalkForwardEvaluator, WalkForwardSplit, build_directional_examples
 from market_sentinel_ai.models import LogisticDirectionalModel, MomentumBaselineModel
 from market_sentinel_ai.releases import CURRENT_RELEASE, RELEASE_PLAN
+from market_sentinel_ai.signals import SignalEngine
 from market_sentinel_ai.storage import SQLiteCandleRepository, sqlite_path_from_url
 
 
@@ -42,6 +46,17 @@ def main() -> None:
     walk_forward.add_argument("--train-size", type=int, default=500)
     walk_forward.add_argument("--test-size", type=int, default=100)
 
+    signals = subparsers.add_parser("signals-demo")
+    signals.add_argument("--symbol", default="SPY")
+    signals.add_argument("--timeframe", choices=[item.value for item in Timeframe], default="5m")
+    signals.add_argument("--days", type=int, default=10)
+
+    dashboard = subparsers.add_parser("dashboard-demo")
+    dashboard.add_argument("--symbol", default="SPY")
+    dashboard.add_argument("--timeframe", choices=[item.value for item in Timeframe], default="5m")
+    dashboard.add_argument("--days", type=int, default=30)
+    dashboard.add_argument("--output", default="reports/dashboard.html")
+
     args = parser.parse_args()
     command = args.command or "status"
     settings = Settings.from_env()
@@ -65,6 +80,12 @@ def main() -> None:
             args.train_size,
             args.test_size,
         )
+        return
+    if command == "signals-demo":
+        _signals_demo(settings, args.symbol, Timeframe(args.timeframe), args.days)
+        return
+    if command == "dashboard-demo":
+        _dashboard_demo(settings, args.symbol, Timeframe(args.timeframe), args.days, args.output)
         return
     parser.error(f"unknown command: {command}")
 
@@ -176,6 +197,89 @@ def _walk_forward_demo(
         model_factory=lambda: LogisticDirectionalModel(horizon_minutes=5, epochs=100),
         splitter=WalkForwardSplit(train_size=train_size, test_size=test_size),
     )
+
+
+def _signals_demo(settings: Settings, symbol: str, timeframe: Timeframe, days: int) -> None:
+    signal = _demo_signal(settings, symbol, timeframe, days)
+    alert_channel = DryRunAlertChannel()
+    alert_id = alert_channel.send(signal)
+    print(
+        json.dumps(
+            {
+                "alert_id": alert_id,
+                "symbol": signal.prediction.symbol,
+                "direction": signal.prediction.direction.value,
+                "confidence": signal.confidence,
+                "probability": signal.prediction.probability,
+                "rationale": signal.rationale,
+                "risk_notes": list(signal.risk_notes),
+            },
+            indent=2,
+            sort_keys=True,
+        )
+    )
+
+
+def _dashboard_demo(
+    settings: Settings,
+    symbol: str,
+    timeframe: Timeframe,
+    days: int,
+    output: str,
+) -> None:
+    end = datetime.now(tz=UTC).replace(second=0, microsecond=0)
+    start = end - timedelta(days=days)
+    provider = DemoMarketDataProvider()
+    feature_engine = OHLCVFeatureEngine(rolling_window=20)
+    candles = list(provider.historical_candles(symbol, timeframe, start, end))
+    signal = _demo_signal(settings, symbol, timeframe, min(days, 10))
+
+    backtest = SimpleBacktestEngine(
+        feature_engine=feature_engine,
+        model=MomentumBaselineModel(horizon_minutes=5),
+        fee_bps=settings.risk.default_fee_bps,
+        slippage_bps=settings.risk.default_slippage_bps,
+    ).run(candles)
+
+    examples = build_directional_examples(candles, feature_engine, horizon_candles=1)
+    train_size = min(500, max(20, len(examples) // 3))
+    test_size = min(100, max(10, len(examples) // 10))
+    walk_forward_report = WalkForwardEvaluator(
+        model_factory=lambda: LogisticDirectionalModel(horizon_minutes=5, epochs=50),
+        splitter=WalkForwardSplit(train_size=train_size, test_size=test_size),
+    ).evaluate(examples)
+
+    html = render_dashboard(
+        DashboardViewModel(
+            title="Market Sentinel AI",
+            generated_at_iso=datetime.now(tz=UTC).isoformat(),
+            signals=(signal,),
+            backtest=backtest,
+            walk_forward={
+                "average_accuracy": walk_forward_report.average_accuracy,
+                "average_coverage": walk_forward_report.average_coverage,
+                "folds": len(walk_forward_report.folds),
+            },
+        )
+    )
+    output_path = Path(output)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(html, encoding="utf-8")
+    print(json.dumps({"dashboard": str(output_path), "bytes": len(html)}, indent=2, sort_keys=True))
+
+
+def _demo_signal(settings: Settings, symbol: str, timeframe: Timeframe, days: int):
+    end = datetime.now(tz=UTC).replace(second=0, microsecond=0)
+    start = end - timedelta(days=days)
+    provider = DemoMarketDataProvider()
+    feature_engine = OHLCVFeatureEngine(rolling_window=20)
+    candles = list(provider.historical_candles(symbol, timeframe, start, end))
+    features = feature_engine.transform(candles)
+    prediction = MomentumBaselineModel(horizon_minutes=5, momentum_threshold_bps=0.5).predict(features)
+    return SignalEngine(
+        min_probability=0.52,
+        min_expected_return_bps=settings.risk.default_fee_bps + settings.risk.default_slippage_bps,
+    ).from_prediction(prediction)
     report = evaluator.evaluate(examples)
     print(
         json.dumps(
