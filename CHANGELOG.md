@@ -4,6 +4,21 @@ All notable changes to Market Sentinel AI will be documented in this file.
 
 The project follows semantic versioning once v1.0.0 is reached. Pre-1.0 releases map to the staged roadmap.
 
+## [1.6.0] - 2026-09-19
+
+### Added
+
+- Added SQLite-backed paper accounts and simulated trade recovery across process restarts.
+- Added persistent drift reports and application health history.
+- Added SQLite integrity checks and backup support for operational recovery.
+- Added paper account, paper trades, drift, health details and health history API endpoints.
+- Added health and backup CLI commands and C6 persistence tests.
+
+### Changed
+
+- Updated the completion track status to C6.
+- Kept real execution disabled in every persisted paper account and health response.
+
 ## [1.5.0] - 2026-09-19
 
 ### Added

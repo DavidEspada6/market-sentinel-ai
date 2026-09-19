@@ -19,6 +19,11 @@ The default binding is local-only. The service does not place real orders.
 - \`GET /api/v1/alerts\` lists persisted alert deliveries.
 - GET /api/v1/runs lists scheduler runs.
 - GET /api/v1/astra-usage lists today's request, cache, token and estimated-cost counters.
+- GET /api/v1/paper/account returns the recovered paper equity state.
+- GET /api/v1/paper/trades lists persisted simulated trades.
+- GET /api/v1/drift lists persisted feature-drift reports.
+- GET /api/v1/health/details runs and persists a database/application health check.
+- GET /api/v1/health/history lists previous health checks.
 - \`POST /api/v1/scan\` ingests the configured market data, produces a risk-gated signal and
   persists the result. The JSON body accepts \`symbol\`, \`timeframe\` and positive \`days\`.
 - \`GET /\` serves the operational dashboard.

@@ -4,6 +4,7 @@ from market_sentinel_ai.ports.features import FeatureEngine
 from market_sentinel_ai.ports.market_data import MarketDataProvider
 from market_sentinel_ai.ports.models import PredictiveModel
 from market_sentinel_ai.ports.order_book import OrderBookProvider
+from market_sentinel_ai.ports.paper import PaperPortfolioStore
 from market_sentinel_ai.ports.reasoning import ReasoningProvider
 from market_sentinel_ai.ports.storage import CandleRepository
 
@@ -14,6 +15,7 @@ __all__ = [
     "FeatureEngine",
     "MarketDataProvider",
     "OrderBookProvider",
+    "PaperPortfolioStore",
     "PredictiveModel",
     "ReasoningProvider",
 ]

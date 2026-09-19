@@ -1,31 +1,36 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 from datetime import datetime
+from uuid import uuid4
 
+from market_sentinel_ai.domain.paper import PaperTrade, PaperTradeRecord
 from market_sentinel_ai.domain.prediction import Direction, Signal
 from market_sentinel_ai.domain.risk import RiskLimits
-
-
-@dataclass(frozen=True)
-class PaperTrade:
-    symbol: str
-    direction: Direction
-    quantity: float
-    entry_price: float
-    exit_price: float
-    pnl: float
-    opened_at: datetime
-    closed_at: datetime
+from market_sentinel_ai.ports.paper import PaperPortfolioStore
 
 
 class PaperTradingLedger:
-    def __init__(self, starting_equity: float = 100_000.0) -> None:
+    def __init__(
+        self,
+        starting_equity: float = 100_000.0,
+        *,
+        store: PaperPortfolioStore | None = None,
+        account_id: str = "default",
+    ) -> None:
         if starting_equity <= 0:
             raise ValueError("starting_equity must be positive")
-        self.starting_equity = starting_equity
-        self.equity = starting_equity
+        self.store = store
+        self.account_id = account_id
+        recovered = store.load_paper_account(account_id) if store is not None else None
+        self.starting_equity = recovered.starting_equity if recovered else starting_equity
+        self.equity = recovered.equity if recovered else starting_equity
         self.trades: list[PaperTrade] = []
+        if store is not None:
+            self.trades = [
+                record.trade for record in store.list_paper_trades(account_id)
+            ]
+            if recovered is None:
+                self._save_account()
 
     def simulate_round_trip(
         self,
@@ -62,8 +67,33 @@ class PaperTradingLedger:
         )
         self.trades.append(trade)
         self.equity += pnl
+        if self.store is not None:
+            self.store.record_paper_trade(
+                PaperTradeRecord(
+                    trade_id=str(uuid4()),
+                    account_id=self.account_id,
+                    trade=trade,
+                )
+            )
+            self._save_account()
         return trade
 
     @property
     def total_pnl(self) -> float:
         return self.equity - self.starting_equity
+
+    def _save_account(self) -> None:
+        from datetime import UTC
+
+        from market_sentinel_ai.domain.paper import PaperAccountSnapshot
+
+        assert self.store is not None
+        self.store.save_paper_account(
+            PaperAccountSnapshot(
+                account_id=self.account_id,
+                starting_equity=self.starting_equity,
+                equity=self.equity,
+                updated_at=datetime.now(tz=UTC),
+                real_execution_enabled=False,
+            )
+        )

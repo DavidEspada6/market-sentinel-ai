@@ -17,7 +17,7 @@ class CliSmokeTests(unittest.TestCase):
         )
 
         payload = json.loads(result.stdout)
-        self.assertEqual(payload["current_release"], "C5")
+        self.assertEqual(payload["current_release"], "C6")
 
     def test_astra_context_demo_has_no_key_path(self) -> None:
         env = {**os.environ, "OPENAI_API_KEY": ""}

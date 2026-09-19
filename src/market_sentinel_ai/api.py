@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 from market_sentinel_ai.config import Settings
 from market_sentinel_ai.dashboard import render_operational_dashboard
 from market_sentinel_ai.domain.market import Timeframe
+from market_sentinel_ai.monitoring import HealthService
 from market_sentinel_ai.operations import MarketScanService
 from market_sentinel_ai.reasoning import AstraUsageLedger
 from market_sentinel_ai.releases import CURRENT_RELEASE
@@ -38,12 +39,12 @@ def create_app(
 
     @app.get("/health")
     def health() -> dict[str, object]:
+        report = HealthService(repository).check()
         return {
-            "status": "ok",
+            **report.to_dict(),
             "environment": active_settings.environment,
             "release": CURRENT_RELEASE.code,
             "version": CURRENT_RELEASE.version,
-            "real_orders_enabled": False,
         }
 
     @app.get("/api/v1/status")
@@ -90,6 +91,52 @@ def create_app(
             "max_requests_per_day": active_settings.openai.max_context_requests_per_day,
             "max_daily_cost_usd": active_settings.openai.max_daily_cost_usd,
         }
+
+    @app.get("/api/v1/health/details")
+    def health_details() -> dict[str, object]:
+        return HealthService(repository).check().to_dict()
+
+    @app.get("/api/v1/paper/account")
+    def paper_account(account_id: str = "default") -> dict[str, object]:
+        snapshot = repository.load_paper_account(account_id)
+        if snapshot is None:
+            raise HTTPException(status_code=404, detail="paper account not found")
+        return {
+            "account_id": snapshot.account_id,
+            "starting_equity": snapshot.starting_equity,
+            "equity": snapshot.equity,
+            "updated_at": snapshot.updated_at.isoformat(),
+            "real_execution_enabled": snapshot.real_execution_enabled,
+        }
+
+    @app.get("/api/v1/paper/trades")
+    def paper_trades(
+        account_id: str = "default",
+        limit: int = Query(default=100, ge=1, le=1000),
+    ) -> list[dict[str, object]]:
+        return [
+            {
+                "trade_id": record.trade_id,
+                "account_id": record.account_id,
+                "symbol": record.trade.symbol,
+                "direction": record.trade.direction.value,
+                "quantity": record.trade.quantity,
+                "entry_price": record.trade.entry_price,
+                "exit_price": record.trade.exit_price,
+                "pnl": record.trade.pnl,
+                "opened_at": record.trade.opened_at.isoformat(),
+                "closed_at": record.trade.closed_at.isoformat(),
+            }
+            for record in repository.list_paper_trades(account_id, limit)
+        ]
+
+    @app.get("/api/v1/drift")
+    def drift_reports(limit: int = Query(default=50, ge=1, le=500)) -> list[dict[str, object]]:
+        return repository.list_drift_reports(limit)
+
+    @app.get("/api/v1/health/history")
+    def health_history(limit: int = Query(default=50, ge=1, le=500)) -> list[dict[str, object]]:
+        return repository.list_health_checks(limit)
 
     @app.post("/api/v1/scan")
     def scan(request: ScanRequest) -> dict[str, object]:

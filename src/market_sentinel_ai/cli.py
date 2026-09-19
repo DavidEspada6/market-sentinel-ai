@@ -35,7 +35,7 @@ from market_sentinel_ai.models import (
     WeightedModel,
     XGBoostDirectionalModel,
 )
-from market_sentinel_ai.monitoring import FeatureDriftDetector, JsonlEventLogger
+from market_sentinel_ai.monitoring import FeatureDriftDetector, HealthService, JsonlEventLogger
 from market_sentinel_ai.operations import MarketScanService, MarketScheduler
 from market_sentinel_ai.paper import PaperTradingLedger
 from market_sentinel_ai.reasoning import (
@@ -147,6 +147,11 @@ def main() -> None:
     drift.add_argument("--timeframe", choices=[item.value for item in Timeframe], default="5m")
     drift.add_argument("--days", type=int, default=20)
 
+    subparsers.add_parser("health")
+
+    backup = subparsers.add_parser("backup")
+    backup.add_argument("--output", default="backups/market_sentinel.sqlite3")
+
     scan = subparsers.add_parser("scan")
     scan.add_argument("--symbol", default="SPY")
     scan.add_argument("--timeframe", choices=[item.value for item in Timeframe], default="5m")
@@ -232,7 +237,13 @@ def main() -> None:
         _paper_demo(settings, args.symbol, Timeframe(args.timeframe), args.days)
         return
     if command == "drift-demo":
-        _drift_demo(args.symbol, Timeframe(args.timeframe), args.days)
+        _drift_demo(settings, args.symbol, Timeframe(args.timeframe), args.days)
+        return
+    if command == "health":
+        _health(settings)
+        return
+    if command == "backup":
+        _backup(settings, args.output)
         return
     if command == "scan":
         _scan(settings, args.symbol, Timeframe(args.timeframe), args.days)
@@ -770,7 +781,12 @@ def _paper_demo(settings: Settings, symbol: str, timeframe: Timeframe, days: int
         signal = SignalEngine(min_probability=0.5, min_expected_return_bps=0.0).from_prediction(
             prediction
         )
-    ledger = PaperTradingLedger(starting_equity=100_000)
+    repository = SQLiteCandleRepository(sqlite_path_from_url(settings.database_url))
+    ledger = PaperTradingLedger(
+        starting_equity=100_000,
+        store=repository,
+        account_id="default",
+    )
     risk = RiskLimits(
         max_position_pct=settings.risk.max_position_pct,
         max_daily_loss_pct=settings.risk.max_daily_loss_pct,
@@ -799,6 +815,7 @@ def _paper_demo(settings: Settings, symbol: str, timeframe: Timeframe, days: int
             {
                 "mode": "paper",
                 "real_orders": False,
+                "account_id": "default",
                 "symbol": symbol.upper(),
                 "trade_created": trade is not None,
                 "equity": ledger.equity,
@@ -811,13 +828,15 @@ def _paper_demo(settings: Settings, symbol: str, timeframe: Timeframe, days: int
     )
 
 
-def _drift_demo(symbol: str, timeframe: Timeframe, days: int) -> None:
+def _drift_demo(settings: Settings, symbol: str, timeframe: Timeframe, days: int) -> None:
     end = datetime.now(tz=UTC).replace(second=0, microsecond=0)
     start = end - timedelta(days=days)
     candles = list(DemoMarketDataProvider().historical_candles(symbol, timeframe, start, end))
     features = OHLCVFeatureEngine(rolling_window=20).transform(candles)
     midpoint = len(features) // 2
     report = FeatureDriftDetector(threshold=2.5).compare(features[:midpoint], features[midpoint:])
+    repository = SQLiteCandleRepository(sqlite_path_from_url(settings.database_url))
+    report_id = repository.record_drift_report(symbol, "feature-drift-demo", report)
     print(
         json.dumps(
             {
@@ -825,8 +844,20 @@ def _drift_demo(symbol: str, timeframe: Timeframe, days: int) -> None:
                 "drifted": report.drifted,
                 "threshold": report.threshold,
                 "scores": report.scores,
+                "report_id": report_id,
             },
             indent=2,
             sort_keys=True,
         )
     )
+
+
+def _health(settings: Settings) -> None:
+    repository = SQLiteCandleRepository(sqlite_path_from_url(settings.database_url))
+    print(json.dumps(HealthService(repository).check().to_dict(), indent=2, sort_keys=True))
+
+
+def _backup(settings: Settings, output: str) -> None:
+    repository = SQLiteCandleRepository(sqlite_path_from_url(settings.database_url))
+    backup_path = repository.backup_to(output)
+    print(json.dumps({"backup": str(backup_path), "real_orders": False}, indent=2, sort_keys=True))

@@ -4,12 +4,20 @@ import json
 import sqlite3
 from collections.abc import Iterable
 from contextlib import closing
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
+from uuid import uuid4
 
 from market_sentinel_ai.domain.ingestion import IngestionRun
 from market_sentinel_ai.domain.market import Candle, Timeframe
 from market_sentinel_ai.domain.operations import AlertRecord, SchedulerRunRecord, SignalRecord
+from market_sentinel_ai.domain.paper import (
+    PaperAccountSnapshot,
+    PaperTrade,
+    PaperTradeRecord,
+)
+from market_sentinel_ai.domain.prediction import Direction
+from market_sentinel_ai.monitoring.drift import DriftReport
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS candles (
@@ -91,6 +99,54 @@ CREATE TABLE IF NOT EXISTS scheduler_runs (
 
 CREATE INDEX IF NOT EXISTS idx_scheduler_runs_finished_at
 ON scheduler_runs(finished_at DESC);
+
+CREATE TABLE IF NOT EXISTS paper_accounts (
+    account_id TEXT PRIMARY KEY,
+    starting_equity REAL NOT NULL,
+    equity REAL NOT NULL,
+    updated_at TEXT NOT NULL,
+    real_execution_enabled INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS paper_trades (
+    trade_id TEXT PRIMARY KEY,
+    account_id TEXT NOT NULL,
+    symbol TEXT NOT NULL,
+    direction TEXT NOT NULL,
+    quantity REAL NOT NULL,
+    entry_price REAL NOT NULL,
+    exit_price REAL NOT NULL,
+    pnl REAL NOT NULL,
+    opened_at TEXT NOT NULL,
+    closed_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_paper_trades_account_closed_at
+ON paper_trades(account_id, closed_at DESC);
+
+CREATE TABLE IF NOT EXISTS drift_reports (
+    report_id TEXT PRIMARY KEY,
+    symbol TEXT NOT NULL,
+    model_name TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    drifted INTEGER NOT NULL,
+    threshold REAL NOT NULL,
+    scores_json TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_drift_reports_created_at
+ON drift_reports(created_at DESC);
+
+CREATE TABLE IF NOT EXISTS health_checks (
+    check_id TEXT PRIMARY KEY,
+    check_name TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    status TEXT NOT NULL,
+    details_json TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_health_checks_created_at
+ON health_checks(created_at DESC);
 """
 
 
@@ -387,6 +443,226 @@ class SQLiteCandleRepository:
             )
             for row in rows
         ]
+
+    def load_paper_account(self, account_id: str) -> PaperAccountSnapshot | None:
+        with closing(self._connect()) as connection:
+            row = connection.execute(
+                """
+                SELECT account_id, starting_equity, equity, updated_at, real_execution_enabled
+                FROM paper_accounts
+                WHERE account_id = ?
+                """,
+                (account_id,),
+            ).fetchone()
+        if row is None:
+            return None
+        return PaperAccountSnapshot(
+            account_id=row["account_id"],
+            starting_equity=row["starting_equity"],
+            equity=row["equity"],
+            updated_at=datetime.fromisoformat(row["updated_at"]),
+            real_execution_enabled=bool(row["real_execution_enabled"]),
+        )
+
+    def save_paper_account(self, snapshot: PaperAccountSnapshot) -> None:
+        if snapshot.real_execution_enabled:
+            raise ValueError("real execution is disabled for paper accounts")
+        with closing(self._connect()) as connection, connection:
+            connection.execute(
+                """
+                INSERT INTO paper_accounts (
+                    account_id, starting_equity, equity, updated_at, real_execution_enabled
+                ) VALUES (?, ?, ?, ?, 0)
+                ON CONFLICT(account_id) DO UPDATE SET
+                    starting_equity = excluded.starting_equity,
+                    equity = excluded.equity,
+                    updated_at = excluded.updated_at,
+                    real_execution_enabled = 0
+                """,
+                (
+                    snapshot.account_id,
+                    snapshot.starting_equity,
+                    snapshot.equity,
+                    snapshot.updated_at.isoformat(),
+                ),
+            )
+
+    def record_paper_trade(self, record: PaperTradeRecord) -> None:
+        trade = record.trade
+        with closing(self._connect()) as connection, connection:
+            connection.execute(
+                """
+                INSERT INTO paper_trades (
+                    trade_id, account_id, symbol, direction, quantity, entry_price,
+                    exit_price, pnl, opened_at, closed_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    record.trade_id,
+                    record.account_id,
+                    trade.symbol,
+                    trade.direction.value,
+                    trade.quantity,
+                    trade.entry_price,
+                    trade.exit_price,
+                    trade.pnl,
+                    trade.opened_at.isoformat(),
+                    trade.closed_at.isoformat(),
+                ),
+            )
+
+    def list_paper_trades(self, account_id: str, limit: int = 500) -> list[PaperTradeRecord]:
+        if limit <= 0:
+            raise ValueError("limit must be positive")
+        with closing(self._connect()) as connection:
+            rows = connection.execute(
+                """
+                SELECT trade_id, account_id, symbol, direction, quantity, entry_price,
+                       exit_price, pnl, opened_at, closed_at
+                FROM paper_trades
+                WHERE account_id = ?
+                ORDER BY closed_at ASC
+                LIMIT ?
+                """,
+                (account_id, limit),
+            ).fetchall()
+        return [
+            PaperTradeRecord(
+                trade_id=row["trade_id"],
+                account_id=row["account_id"],
+                trade=PaperTrade(
+                    symbol=row["symbol"],
+                    direction=Direction(row["direction"]),
+                    quantity=row["quantity"],
+                    entry_price=row["entry_price"],
+                    exit_price=row["exit_price"],
+                    pnl=row["pnl"],
+                    opened_at=datetime.fromisoformat(row["opened_at"]),
+                    closed_at=datetime.fromisoformat(row["closed_at"]),
+                ),
+            )
+            for row in rows
+        ]
+
+    def record_drift_report(
+        self,
+        symbol: str,
+        model_name: str,
+        report: DriftReport,
+    ) -> str:
+        report_id = str(uuid4())
+        with closing(self._connect()) as connection, connection:
+            connection.execute(
+                """
+                INSERT INTO drift_reports (
+                    report_id, symbol, model_name, created_at, drifted, threshold, scores_json
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    report_id,
+                    symbol.upper(),
+                    model_name,
+                    datetime.now(tz=UTC).isoformat(),
+                    int(report.drifted),
+                    report.threshold,
+                    json.dumps(report.scores, sort_keys=True),
+                ),
+            )
+        return report_id
+
+    def list_drift_reports(self, limit: int = 50) -> list[dict[str, object]]:
+        if limit <= 0:
+            raise ValueError("limit must be positive")
+        with closing(self._connect()) as connection:
+            rows = connection.execute(
+                """
+                SELECT report_id, symbol, model_name, created_at, drifted, threshold, scores_json
+                FROM drift_reports
+                ORDER BY created_at DESC
+                LIMIT ?
+                """,
+                (limit,),
+            ).fetchall()
+        return [
+            {
+                "report_id": row["report_id"],
+                "symbol": row["symbol"],
+                "model_name": row["model_name"],
+                "created_at": row["created_at"],
+                "drifted": bool(row["drifted"]),
+                "threshold": row["threshold"],
+                "scores": json.loads(row["scores_json"]),
+            }
+            for row in rows
+        ]
+
+    def record_health_check(
+        self,
+        check_name: str,
+        status: str,
+        details: dict[str, object],
+    ) -> str:
+        check_id = str(uuid4())
+        with closing(self._connect()) as connection, connection:
+            connection.execute(
+                """
+                INSERT INTO health_checks (
+                    check_id, check_name, created_at, status, details_json
+                ) VALUES (?, ?, ?, ?, ?)
+                """,
+                (
+                    check_id,
+                    check_name,
+                    datetime.now(tz=UTC).isoformat(),
+                    status,
+                    json.dumps(details, sort_keys=True, default=str),
+                ),
+            )
+        return check_id
+
+    def list_health_checks(self, limit: int = 50) -> list[dict[str, object]]:
+        if limit <= 0:
+            raise ValueError("limit must be positive")
+        with closing(self._connect()) as connection:
+            rows = connection.execute(
+                """
+                SELECT check_id, check_name, created_at, status, details_json
+                FROM health_checks
+                ORDER BY created_at DESC
+                LIMIT ?
+                """,
+                (limit,),
+            ).fetchall()
+        return [
+            {
+                "check_id": row["check_id"],
+                "check_name": row["check_name"],
+                "created_at": row["created_at"],
+                "status": row["status"],
+                "details": json.loads(row["details_json"]),
+            }
+            for row in rows
+        ]
+
+    def health_status(self) -> dict[str, object]:
+        try:
+            with closing(self._connect()) as connection:
+                integrity = connection.execute("PRAGMA integrity_check").fetchone()[0]
+            return {"status": "ok" if integrity == "ok" else "degraded", "integrity": integrity}
+        except sqlite3.Error as exc:
+            return {"status": "failed", "error": str(exc)}
+
+    def backup_to(self, destination: str | Path) -> Path:
+        destination_path = Path(destination)
+        destination_path.parent.mkdir(parents=True, exist_ok=True)
+        source = self._connect()
+        target = sqlite3.connect(destination_path)
+        try:
+            source.backup(target)
+        finally:
+            target.close()
+            source.close()
+        return destination_path
 
     def _ensure_schema(self) -> None:
         with closing(self._connect()) as connection, connection:
