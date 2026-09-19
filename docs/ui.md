@@ -25,13 +25,19 @@ externamente tienen prioridad sobre `.env`.
 
 - Haz clic en cualquier fila de la watchlist para abrir su grafico.
 - Usa el buscador para localizar otro simbolo y pulsa `Add` para anadirlo.
+- La watchlist muestra una franja verde para lecturas alcistas, roja para bajistas y gris cuando
+  no hay una señal utilizable; la lectura se actualiza con datos del proveedor.
 - Usa el centro de control para lanzar un escaneo, elegir timeframe e historial, activar el
   escaneo periodico y actualizar el estado de la aplicacion.
 - Cambia el intervalo entre 1m, 5m, 30m, 1h, 6h, 12h, 1d, 1w, 1mo, 3mo, 6mo, 1y, 3y y
   `total`.
 - Alterna entre `Línea` y `Velas OHLC`; las velas muestran apertura, máximo, mínimo y cierre.
 - El grafico muestra OHLCV historico, cambio del intervalo, dirección única, predicción central,
-  confianza, entrada, objetivo y stop.
+  confianza, entrada, objetivo y stop. Entrada, objetivo y stop aparecen como bloques separados
+  y coloreados para no confundir sus precios.
+- El eje inferior muestra la linea temporal. Al pasar el raton por encima del grafico aparece la
+  fecha/hora y el precio del punto histórico; en la zona futura muestra la predicción central y
+  su rango aproximado.
 - El panel de paper trading muestra PnL estimado/realizado/total, VaR, CVaR, Sharpe, Sortino,
   drawdown, profit factor, win rate, expectancy, exposicion y operaciones simuladas.
 - El panel de salud muestra estado del servicio, modelo cuantitativo, drift, uso de Astra y la

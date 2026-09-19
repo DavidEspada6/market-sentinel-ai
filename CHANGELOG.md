@@ -4,6 +4,15 @@ All notable changes to Market Sentinel AI will be documented in this file.
 
 The project follows semantic versioning once v1.0.0 is reached. Pre-1.0 releases map to the staged roadmap.
 
+## [2.8.2] - 2026-09-19
+
+### Added
+
+- Added green, red and neutral directional zones to each watchlist row.
+- Separated reference entry, estimated target and stop/invalidation into high-contrast level cards.
+- Added time-axis labels and an interactive hover tooltip with timestamp and OHLC prices.
+- Added future-scenario tooltip values for central forecast, upper range and lower range.
+
 ## [2.8.1] - 2026-09-19
 
 ### Fixed

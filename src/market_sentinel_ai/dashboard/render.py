@@ -212,7 +212,7 @@ def render_operational_dashboard(
         '<tr><td colspan="5">No persisted alerts</td></tr>'
     )
     watchlist_rows = "\n".join(_render_instrument_row(item) for item in watchlist) or (
-        '<tr><td colspan="5">Watchlist is empty</td></tr>'
+        '<tr><td colspan="6">Watchlist is empty</td></tr>'
     )
     default_symbol = watchlist[0].symbol if watchlist else ""
     window_buttons = "".join(
@@ -293,6 +293,15 @@ def render_operational_dashboard(
     .watchlist-row {{ cursor: pointer; transition: background .15s ease; }}
     .watchlist-row:hover {{ background: #eef8f8; }}
     .watchlist-row.selected {{ background: #dff3f3; box-shadow: inset 3px 0 var(--teal); }}
+    .watchlist-row.long-row {{ background: #f0fbf3; box-shadow: inset 4px 0 var(--green); }}
+    .watchlist-row.short-row {{ background: #fff3f2; box-shadow: inset 4px 0 var(--red); }}
+    .watchlist-row.wait-row {{ box-shadow: inset 4px 0 var(--line); }}
+    .watchlist-direction {{ display: inline-flex; min-width: 82px; justify-content: center;
+      border-radius: 4px; padding: 5px 8px; font-size: 11px; font-weight: 800;
+      letter-spacing: .02em; background: #eef1f3; color: var(--muted); }}
+    .watchlist-direction.long {{ background: #d9f5e2; color: #126b32; }}
+    .watchlist-direction.short {{ background: #ffe0de; color: #a51f15; }}
+    .watchlist-direction.wait {{ background: #eef1f3; color: var(--muted); }}
     .market-panel {{ overflow: hidden; }}
     .market-heading {{ display: flex; justify-content: space-between; align-items: flex-start;
       gap: 16px; margin-bottom: 14px; }}
@@ -313,13 +322,28 @@ def render_operational_dashboard(
     .chart-mode-button {{ background: #edf3f4; color: var(--ink); border: 1px solid var(--line);
       padding: 6px 10px; font-size: 12px; }}
     .chart-mode-button:hover, .chart-mode-button.active {{ background: var(--ink); color: #fff; }}
-    .chart-summary {{ display: grid; grid-template-columns: repeat(6, minmax(0, 1fr));
+    .chart-summary {{ display: grid; grid-template-columns: repeat(5, minmax(0, 1fr));
       gap: 10px; margin-bottom: 14px; }}
     .chart-stat {{ border-left: 3px solid var(--teal); padding: 6px 0 6px 10px; }}
     .chart-stat span {{ display: block; color: var(--muted); font-size: 11px; text-transform: uppercase; }}
     .chart-stat strong {{ display: block; margin-top: 3px; font-size: 16px; }}
+    .trade-levels {{ display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px; margin: -2px 0 14px; }}
+    .level-card {{ border: 1px solid var(--line); border-left: 5px solid var(--blue);
+      background: #f7fbff; padding: 9px 12px; min-width: 0; }}
+    .level-card.target {{ border-left-color: var(--green); background: #f3fbf5; }}
+    .level-card.stop {{ border-left-color: var(--red); background: #fff6f5; }}
+    .level-card span {{ display: block; color: var(--muted); font-size: 11px; font-weight: 700;
+      text-transform: uppercase; }}
+    .level-card strong {{ display: block; margin-top: 4px; font-size: 19px; white-space: nowrap;
+      overflow: hidden; text-overflow: ellipsis; }}
     .chart-wrap {{ width: 100%; min-height: 340px; border: 1px solid var(--line); background: #fbfcfc; }}
+    .chart-wrap {{ position: relative; }}
     #market-chart {{ display: block; width: 100%; height: 340px; }}
+    .chart-tooltip {{ position: absolute; z-index: 3; pointer-events: none; white-space: pre-line;
+      max-width: 230px; padding: 8px 10px; border: 1px solid #183b45; border-radius: 4px;
+      background: rgba(24, 32, 38, .96); color: #fff; font-size: 12px; line-height: 1.45;
+      box-shadow: 0 4px 12px rgba(24, 32, 38, .18); }}
     .chart-legend {{ display: flex; flex-wrap: wrap; gap: 12px; margin-top: 10px; color: var(--muted);
       font-size: 12px; }}
     .legend-item::before {{ content: ""; display: inline-block; width: 22px; height: 3px;
@@ -337,7 +361,7 @@ def render_operational_dashboard(
       main {{ padding: 14px; }} .summary {{ grid-template-columns: 1fr; }}
       .panel {{ overflow-x: auto; }} table {{ min-width: 680px; }}
       .market-heading {{ flex-direction: column; }} .market-badges {{ justify-content: flex-start; }}
-      .chart-summary {{ grid-template-columns: repeat(2, minmax(0, 1fr)); }}
+      .chart-summary, .trade-levels {{ grid-template-columns: repeat(2, minmax(0, 1fr)); }}
       .window-buttons {{ min-width: 620px; }} .system-grid, .risk-grid {{ grid-template-columns: repeat(2, minmax(0, 1fr)); }}
       .data-layout {{ grid-template-columns: 1fr; }} .diagnostic-grid {{ grid-template-columns: 1fr; }} }}
   </style>
@@ -413,7 +437,7 @@ def render_operational_dashboard(
       </form>
       <div id="instrument-results" class="search-results" aria-live="polite"></div>
       <div id="watchlist-status" class="status" aria-live="polite"></div>
-      <table><thead><tr><th>Symbol</th><th>Name</th><th>Class</th><th>Exchange</th><th></th></tr>
+      <table><thead><tr><th>Symbol</th><th>Name</th><th>Class</th><th>Exchange</th><th>Lectura</th><th></th></tr>
       </thead><tbody id="watchlist-rows">{watchlist_rows}</tbody></table>
     </div></section>
     <section><div class="panel market-panel" id="market-detail">
@@ -438,12 +462,17 @@ def render_operational_dashboard(
         <div class="chart-stat"><span>Dirección</span><strong>-</strong></div>
         <div class="chart-stat"><span>Confianza</span><strong>-</strong></div>
         <div class="chart-stat"><span>Predicción central</span><strong>-</strong></div>
-        <div class="chart-stat"><span>Objetivo / stop</span><strong>-</strong></div>
+      </div>
+      <div class="trade-levels" id="trade-levels">
+        <div class="level-card entry"><span>Entrada de referencia</span><strong id="level-entry">-</strong></div>
+        <div class="level-card target"><span>Objetivo estimado</span><strong id="level-target">-</strong></div>
+        <div class="level-card stop"><span>Stop / invalidación</span><strong id="level-stop">-</strong></div>
       </div>
       <div class="decision-note" id="market-decision" aria-live="polite">
         Selecciona un activo para obtener una lectura direccional.
       </div>
       <div class="chart-wrap"><canvas id="market-chart" height="340" aria-label="Gráfico de mercado"></canvas>
+        <div id="chart-tooltip" class="chart-tooltip" role="status" hidden></div>
         <div class="market-empty" id="market-empty">No hay un activo seleccionado.</div></div>
       <div class="chart-legend"><span class="legend-item">Histórico</span>
         <span class="legend-item forecast" id="forecast-label">Rango futuro aprox.</span>
@@ -515,6 +544,8 @@ def render_operational_dashboard(
     const marketSource = document.getElementById('market-source');
     const marketSummary = document.getElementById('market-summary');
     const marketCanvas = document.getElementById('market-chart');
+    const chartWrap = document.querySelector('.chart-wrap');
+    const chartTooltip = document.getElementById('chart-tooltip');
     const marketEmpty = document.getElementById('market-empty');
     const marketDisclaimer = document.getElementById('market-disclaimer');
     const marketDecision = document.getElementById('market-decision');
@@ -525,6 +556,8 @@ def render_operational_dashboard(
     let chartMode = 'line';
     let periodicTimer = null;
     let lastChartPayload = null;
+    let chartLayout = null;
+    let chartHoverIndex = null;
     const operationStatus = document.getElementById('operation-status');
     const scanTimeframe = document.getElementById('scan-timeframe');
     const scanDays = document.getElementById('scan-days');
@@ -660,15 +693,17 @@ def render_operational_dashboard(
         formatPercent(payload.change_pct),
         directionLabel,
         formatConfidence(signal.confidence),
-        centralValue,
-        `${{formatPrice(levels.target)}} / ${{formatPrice(levels.stop)}}`
+        centralValue
       ];
       [...marketSummary.querySelectorAll('strong')].forEach((node, index) => {{
         node.textContent = values[index];
       }});
+      document.getElementById('level-entry').textContent = formatPrice(levels.entry);
+      document.getElementById('level-target').textContent = formatPrice(levels.target);
+      document.getElementById('level-stop').textContent = formatPrice(levels.stop);
     }}
 
-    function drawMarketChart(payload) {{
+    function drawMarketChart(payload, hoverIndex = chartHoverIndex) {{
       const historical = payload.candles || [];
       const future = (payload.forecast && payload.forecast.center) || [];
       const upper = (payload.forecast && payload.forecast.upper) || [];
@@ -691,6 +726,8 @@ def render_operational_dashboard(
       const total = Math.max(2, historical.length + future.length - 1);
       const x = (index) => left + (index / (total - 1)) * plotWidth;
       const y = (value) => top + ((maxValue - value) / (maxValue - minValue)) * plotHeight;
+      chartLayout = {{ historical, future, upper, lower, total, left, right, top, bottom,
+        width, height, plotWidth, plotHeight, x, y }};
       ctx.clearRect(0, 0, width, height); ctx.fillStyle = '#fbfcfc'; ctx.fillRect(0, 0, width, height);
       ctx.font = '11px Segoe UI, Arial'; ctx.strokeStyle = '#e2e8eb'; ctx.fillStyle = '#5e6a72';
       for (let index = 0; index <= 4; index += 1) {{
@@ -699,6 +736,29 @@ def render_operational_dashboard(
         const label = maxValue - (index / 4) * (maxValue - minValue);
         ctx.fillText(formatPrice(label), 6, yy + 4);
       }}
+      const timeForIndex = (index) => {{
+        if (index < historical.length) return historical[index].time;
+        const futureIndex = index - (historical.length - 1);
+        return future[futureIndex] ? future[futureIndex].time : historical[historical.length - 1].time;
+      }};
+      const firstTime = new Date(timeForIndex(0)).getTime();
+      const lastTime = new Date(timeForIndex(total - 1)).getTime();
+      const formatAxisTime = (iso) => {{
+        const date = new Date(iso);
+        return lastTime - firstTime >= 86_400_000 ?
+          date.toLocaleDateString(undefined, {{day: '2-digit', month: 'short'}}) :
+          date.toLocaleTimeString(undefined, {{hour: '2-digit', minute: '2-digit'}});
+      }};
+      const timelineIndexes = [...new Set([0, Math.floor((total - 1) * 0.25),
+        Math.floor((total - 1) * 0.5), Math.floor((total - 1) * 0.75), total - 1])];
+      ctx.strokeStyle = '#eef1f3'; ctx.fillStyle = '#5e6a72'; ctx.lineWidth = 1;
+      ctx.textAlign = 'center';
+      timelineIndexes.forEach((index) => {{
+        const xx = x(index);
+        ctx.beginPath(); ctx.moveTo(xx, top); ctx.lineTo(xx, height - bottom); ctx.stroke();
+        ctx.fillText(formatAxisTime(timeForIndex(index)), xx, height - 10);
+      }});
+      ctx.textAlign = 'left';
       const line = (points, color, dashed = false, startIndex = 0) => {{
         if (!points.length) return;
         ctx.beginPath(); ctx.setLineDash(dashed ? [6, 5] : []); ctx.strokeStyle = color; ctx.lineWidth = 2;
@@ -745,12 +805,109 @@ def render_operational_dashboard(
       horizontal(payload.levels && payload.levels.entry, '#2563eb', 'Entrada');
       horizontal(payload.levels && payload.levels.target, '#16803c', 'Objetivo');
       horizontal(payload.levels && payload.levels.stop, '#b42318', 'Stop');
+      if (typeof hoverIndex === 'number' && hoverIndex >= 0 && hoverIndex < total) {{
+        const xx = x(hoverIndex);
+        ctx.beginPath(); ctx.setLineDash([3, 3]); ctx.strokeStyle = '#183b45'; ctx.lineWidth = 1;
+        ctx.moveTo(xx, top); ctx.lineTo(xx, height - bottom); ctx.stroke(); ctx.setLineDash([]);
+        const historicalPoint = hoverIndex < historical.length ? historical[hoverIndex] : null;
+        const value = historicalPoint ? historicalPoint.close :
+          future[hoverIndex - (historical.length - 1)]?.value;
+        if (typeof value === 'number') {{
+          ctx.beginPath(); ctx.fillStyle = '#183b45'; ctx.arc(xx, y(value), 4, 0, Math.PI * 2); ctx.fill();
+        }}
+      }}
+    }}
+
+    function formatHoverTime(value) {{
+      return new Date(value).toLocaleString(undefined, {{
+        year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit'
+      }});
+    }}
+
+    function showChartTooltip(event) {{
+      if (!chartLayout || !lastChartPayload) return;
+      const canvasRect = marketCanvas.getBoundingClientRect();
+      const wrapRect = chartWrap.getBoundingClientRect();
+      const canvasX = event.clientX - canvasRect.left;
+      const canvasY = event.clientY - canvasRect.top;
+      if (canvasX < chartLayout.left || canvasX > canvasRect.width - chartLayout.right ||
+          canvasY < chartLayout.top || canvasY > chartLayout.height - chartLayout.bottom) {{
+        chartHoverIndex = null; chartTooltip.hidden = true; drawMarketChart(lastChartPayload); return;
+      }}
+      const ratio = (canvasX - chartLayout.left) / chartLayout.plotWidth;
+      chartHoverIndex = Math.max(0, Math.min(chartLayout.total - 1,
+        Math.round(ratio * (chartLayout.total - 1))));
+      drawMarketChart(lastChartPayload, chartHoverIndex);
+      const historical = chartLayout.historical;
+      const future = chartLayout.future;
+      const historicalPoint = chartHoverIndex < historical.length ?
+        historical[chartHoverIndex] : null;
+      let message;
+      if (historicalPoint) {{
+        message = `Hora: ${{formatHoverTime(historicalPoint.time)}}\n` +
+          `Apertura: ${{formatPrice(historicalPoint.open)}}\n` +
+          `Máximo: ${{formatPrice(historicalPoint.high)}}\n` +
+          `Mínimo: ${{formatPrice(historicalPoint.low)}}\n` +
+          `Cierre: ${{formatPrice(historicalPoint.close)}}`;
+      }} else {{
+        const futurePoint = future[chartHoverIndex - (historical.length - 1)];
+        message = futurePoint ?
+          `Escenario: ${{formatHoverTime(futurePoint.time)}}\n` +
+          `Predicción central: ${{formatPrice(futurePoint.value)}}\n` +
+          `Rango: ${{formatPrice((lastChartPayload.forecast.upper[chartHoverIndex - (historical.length - 1)] || {{}}).value)}} - ` +
+          `${{formatPrice((lastChartPayload.forecast.lower[chartHoverIndex - (historical.length - 1)] || {{}}).value)}}` :
+          'Sin datos para este punto';
+      }}
+      chartTooltip.textContent = message;
+      chartTooltip.hidden = false;
+      const localX = event.clientX - wrapRect.left;
+      const localY = event.clientY - wrapRect.top;
+      const tooltipWidth = chartTooltip.offsetWidth || 220;
+      const tooltipHeight = chartTooltip.offsetHeight || 80;
+      const nextLeft = Math.min(localX + 16, wrapRect.width - tooltipWidth - 8);
+      const nextTop = Math.max(8, Math.min(localY + 16, wrapRect.height - tooltipHeight - 8));
+      chartTooltip.style.left = `${{Math.max(8, nextLeft)}}px`;
+      chartTooltip.style.top = `${{nextTop}}px`;
+    }}
+
+    function hideChartTooltip() {{
+      chartHoverIndex = null;
+      chartTooltip.hidden = true;
+      if (lastChartPayload) drawMarketChart(lastChartPayload, null);
     }}
 
     function markSelectedRow(symbol) {{
       document.querySelectorAll('.watchlist-row').forEach((row) => {{
         row.classList.toggle('selected', row.dataset.symbol === symbol);
       }});
+    }}
+
+    async function updateWatchlistDirections() {{
+      const watchlistRows = [...document.querySelectorAll('.watchlist-row')];
+      await Promise.all(watchlistRows.map(async (row) => {{
+        const symbol = row.dataset.symbol;
+        const badge = row.querySelector('[data-watchlist-direction]');
+        if (!symbol || !badge) return;
+        try {{
+          const response = await fetch(`/api/v1/market/${{encodeURIComponent(symbol)}}?window=1d`);
+          if (!response.ok) throw new Error('market data unavailable');
+          const payload = await response.json();
+          const direction = payload.signal && payload.signal.direction || 'NO_TRADE';
+          const label = direction === 'LONG' ? 'ALCISTA' : direction === 'SHORT' ? 'BAJISTA' : 'ESPERAR';
+          const cssClass = direction === 'LONG' ? 'long' : direction === 'SHORT' ? 'short' : 'wait';
+          badge.textContent = label;
+          badge.className = `watchlist-direction ${{cssClass}}`;
+          badge.title = `${{payload.signal.model}} · confianza ${{formatConfidence(payload.signal.confidence)}}`;
+          row.classList.remove('long-row', 'short-row', 'wait-row');
+          row.classList.add(`${{cssClass}}-row`);
+        }} catch (error) {{
+          badge.textContent = 'SIN DATOS';
+          badge.className = 'watchlist-direction wait';
+          row.classList.remove('long-row', 'short-row'); row.classList.add('wait-row');
+          badge.title = 'No se pudo obtener una señal actual para este producto';
+        }}
+      }}));
     }}
 
     async function loadMarket(symbol, windowValue) {{
@@ -770,6 +927,7 @@ def render_operational_dashboard(
       }}
       const payload = await response.json();
       lastChartPayload = payload;
+      chartHoverIndex = null; chartTooltip.hidden = true;
       marketTitle.textContent = `${{payload.symbol}} · ${{payload.name}}`;
       marketMeta.textContent = `${{payload.window_label}} · ${{payload.candle_count}} velas · ` +
         `${{payload.timeframe}} · ${{payload.currency}} · modelo ${{payload.signal.model}}`;
@@ -853,15 +1011,19 @@ def render_operational_dashboard(
     document.querySelectorAll('.chart-mode-button').forEach((button) => {{
       button.addEventListener('click', () => {{
         chartMode = button.dataset.chartMode;
+        chartHoverIndex = null; chartTooltip.hidden = true;
         document.querySelectorAll('.chart-mode-button').forEach((item) =>
           item.classList.toggle('active', item.dataset.chartMode === chartMode));
         if (lastChartPayload) drawMarketChart(lastChartPayload);
       }});
     }});
+    marketCanvas.addEventListener('mousemove', showChartTooltip);
+    marketCanvas.addEventListener('mouseleave', hideChartTooltip);
     window.addEventListener('resize', () => {{
       if (lastChartPayload) drawMarketChart(lastChartPayload);
     }});
     if (defaultSymbol) loadMarket(defaultSymbol, selectedWindow);
+    updateWatchlistDirections();
     let scanInFlight = false;
     async function runWatchlistScan() {{
       if (scanInFlight) return;
@@ -948,6 +1110,8 @@ def _render_instrument_row(instrument: Instrument) -> str:
         f"<td>{escape(instrument.name)}</td>"
         f"<td>{escape(instrument.asset_class.value)}</td>"
         f"<td>{escape(instrument.exchange)}</td>"
+        f'<td><span class="watchlist-direction wait" '
+        f'data-watchlist-direction="{escape(instrument.symbol)}">CARGANDO</span></td>'
         f'<td><button type="button" class="secondary remove-instrument" '
         f'data-symbol="{escape(instrument.symbol)}">Remove</button></td>'
         "</tr>"

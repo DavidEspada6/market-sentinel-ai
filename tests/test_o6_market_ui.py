@@ -123,6 +123,7 @@ class O6MarketUITests(unittest.TestCase):
 
             self.assertIn('id="market-chart"', html)
             self.assertIn('class="watchlist-row"', html)
+            self.assertIn('data-watchlist-direction=', html)
             self.assertIn('data-window="1mo"', html)
             self.assertIn("/api/v1/market/", html)
             self.assertIn('id="scan-periodic"', html)
@@ -131,6 +132,11 @@ class O6MarketUITests(unittest.TestCase):
             self.assertIn('id="model-status"', html)
             self.assertIn('id="market-decision"', html)
             self.assertIn('id="forecast-label"', html)
+            self.assertIn('id="level-entry"', html)
+            self.assertIn('id="level-target"', html)
+            self.assertIn('id="level-stop"', html)
+            self.assertIn('id="chart-tooltip"', html)
+            self.assertIn("mousemove", html)
             self.assertIn('data-chart-mode="candles"', html)
             self.assertIn("Velas OHLC", html)
 

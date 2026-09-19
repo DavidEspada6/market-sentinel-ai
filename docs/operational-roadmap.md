@@ -12,7 +12,7 @@ releases make it a practical daily analysis tool while keeping paper trading as 
 | O5 | 2.5.0 | Complete | Production operations, notifications, data quality and continuous observability |
 | O6 | 2.6.0 | Complete | Interactive color dashboard, chart windows, future scenarios and visual risk levels |
 | O7 | 2.7.4 | Complete | Complete UI control center for scanning, paper metrics and diagnostics |
-| O8 | 2.8.1 | Current | Adaptive supervised predictions, cost-aware labels and visible walk-forward diagnostics |
+| O8 | 2.8.2 | Current | Adaptive predictions, directional watchlist zones and interactive chart inspection |
 | O9 | 3.0.0 | Optional | Broker integration only after explicit approval and a separate security review |
 
 ## What "operational" means
