@@ -15,7 +15,7 @@ Market Sentinel AI is split into ports and adapters so every expensive, unreliab
 
 ### Configuration
 
-`market_sentinel_ai.config` reads settings from environment variables. No secret has a default real value. R0 avoids loading a `.env` file automatically so CI and production behavior remain explicit.
+`market_sentinel_ai.config` reads settings from environment variables. No secret has a default real value. The Python package keeps `.env` loading explicit for CI and production; the Windows launcher loads the local `.env` for the desktop workflow.
 
 ### Domain
 

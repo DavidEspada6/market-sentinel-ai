@@ -203,7 +203,19 @@ def create_app(
             candles = []
 
         if not candles:
-            candles = repository.list_candles(market_symbol, spec.timeframe, start, end)
+            cached = repository.list_candles(market_symbol, spec.timeframe, start, end)
+            provider_name = getattr(active_service.provider, "provider_name", "unknown")
+            if provider_name != "demo":
+                latest_run = repository.latest_ingestion_run(market_symbol, spec.timeframe)
+                if latest_run is None or latest_run.provider != provider_name:
+                    raise HTTPException(
+                        status_code=503,
+                        detail=(
+                            f"fresh {provider_name} market data is unavailable for {normalized}; "
+                            "the UI will not substitute demo or another provider's cached data"
+                        ),
+                    )
+            candles = cached
         if not candles and market_symbol != normalized:
             candles = repository.list_candles(normalized, spec.timeframe, start, end)
         if not candles:

@@ -17,9 +17,9 @@ python -m pip install -e ".[dev,ml,api]"
 4. Para detener la aplicacion, cierra la ventana de PowerShell del servidor.
 
 La primera ejecucion crea `.env` desde `.env.example` y el lanzador carga sus variables al iniciar.
-El modo predeterminado usa datos demo deterministas. Para consultar datos de mercado actuales sin
-una clave, edita `.env` y usa `MARKET_DATA_PROVIDER=yahoo`; la busqueda de instrumentos usa Yahoo
-por defecto. Las variables definidas externamente tienen prioridad sobre `.env`.
+El modo operativo predeterminado usa datos actuales de Yahoo Finance sin una clave. Los datos demo
+solo se usan si eliges explicitamente `MARKET_DATA_PROVIDER=demo`. Las variables definidas
+externamente tienen prioridad sobre `.env`.
 
 ## Analizar un producto
 
@@ -29,12 +29,15 @@ por defecto. Las variables definidas externamente tienen prioridad sobre `.env`.
   escaneo periodico y actualizar el estado de la aplicacion.
 - Cambia el intervalo entre 1m, 5m, 30m, 1h, 6h, 12h, 1d, 1w, 1mo, 3mo, 6mo, 1y, 3y y
   `total`.
-- El grafico muestra OHLCV historico, cambio del intervalo, confianza, entrada, objetivo y stop.
+- Alterna entre `Línea` y `Velas OHLC`; las velas muestran apertura, máximo, mínimo y cierre.
+- El grafico muestra OHLCV historico, cambio del intervalo, dirección única, predicción central,
+  confianza, entrada, objetivo y stop.
 - El panel de paper trading muestra PnL estimado/realizado/total, VaR, CVaR, Sharpe, Sortino,
   drawdown, profit factor, win rate, expectancy, exposicion y operaciones simuladas.
 - El panel de salud muestra estado del servicio, drift, uso de Astra y la ultima ejecucion.
-- La banda futura superior e inferior es un escenario aproximado calculado con ATR y momentum.
-  No es una prediccion garantizada, asesoramiento financiero ni una orden automatica.
+- La dirección central es la lectura del modelo para el horizonte elegido. La banda futura superior
+  e inferior es un rango aproximado calculado con ATR y momentum, no una segunda predicción
+  contraria. No es una prediccion garantizada, asesoramiento financiero ni una orden automatica.
 
 El panel sigue siendo alert-only y paper trading. No envia ordenes reales.
 

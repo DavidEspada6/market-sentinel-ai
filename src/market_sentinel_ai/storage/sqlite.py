@@ -307,6 +307,42 @@ class SQLiteCandleRepository:
             for row in rows
         ]
 
+    def latest_ingestion_run(
+        self,
+        symbol: str,
+        timeframe: Timeframe,
+    ) -> IngestionRun | None:
+        with closing(self._connect()) as connection:
+            row = connection.execute(
+                """
+                SELECT run_id, provider, symbol, timeframe, requested_start, requested_end,
+                       started_at, finished_at, status, fetched_rows, stored_rows,
+                       quality_json, error
+                FROM ingestion_runs
+                WHERE symbol = ? AND timeframe = ?
+                ORDER BY finished_at DESC
+                LIMIT 1
+                """,
+                (symbol.upper(), timeframe.value),
+            ).fetchone()
+        if row is None:
+            return None
+        return IngestionRun(
+            run_id=row["run_id"],
+            provider=row["provider"],
+            symbol=row["symbol"],
+            timeframe=row["timeframe"],
+            requested_start=datetime.fromisoformat(row["requested_start"]),
+            requested_end=datetime.fromisoformat(row["requested_end"]),
+            started_at=datetime.fromisoformat(row["started_at"]),
+            finished_at=datetime.fromisoformat(row["finished_at"]),
+            status=row["status"],
+            fetched_rows=row["fetched_rows"],
+            stored_rows=row["stored_rows"],
+            quality_json=row["quality_json"],
+            error=row["error"],
+        )
+
     def record_signal(self, signal: SignalRecord) -> None:
         with closing(self._connect()) as connection, connection:
             connection.execute(

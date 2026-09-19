@@ -308,7 +308,12 @@ def render_operational_dashboard(
     .window-button {{ background: #edf3f4; color: var(--ink); border: 1px solid transparent;
       padding: 7px 9px; font-size: 12px; }}
     .window-button:hover, .window-button.active {{ background: var(--teal); color: #fff; }}
-    .chart-summary {{ display: grid; grid-template-columns: repeat(5, minmax(0, 1fr));
+    .chart-toolbar {{ display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }}
+    .chart-mode-buttons {{ display: inline-flex; gap: 4px; }}
+    .chart-mode-button {{ background: #edf3f4; color: var(--ink); border: 1px solid var(--line);
+      padding: 6px 10px; font-size: 12px; }}
+    .chart-mode-button:hover, .chart-mode-button.active {{ background: var(--ink); color: #fff; }}
+    .chart-summary {{ display: grid; grid-template-columns: repeat(6, minmax(0, 1fr));
       gap: 10px; margin-bottom: 14px; }}
     .chart-stat {{ border-left: 3px solid var(--teal); padding: 6px 0 6px 10px; }}
     .chart-stat span {{ display: block; color: var(--muted); font-size: 11px; text-transform: uppercase; }}
@@ -420,11 +425,19 @@ def render_operational_dashboard(
           <span class="pill" id="market-source">-</span></div>
       </div>
       <div class="window-buttons" id="window-buttons">{window_buttons}</div>
+      <div class="chart-toolbar">
+        <span class="meta">Representación</span>
+        <div class="chart-mode-buttons" id="chart-mode-buttons">
+          <button type="button" class="chart-mode-button active" data-chart-mode="line">Línea</button>
+          <button type="button" class="chart-mode-button" data-chart-mode="candles">Velas OHLC</button>
+        </div>
+      </div>
       <div class="chart-summary" id="market-summary">
         <div class="chart-stat"><span>Último</span><strong>-</strong></div>
         <div class="chart-stat"><span>Cambio ventana</span><strong>-</strong></div>
+        <div class="chart-stat"><span>Dirección</span><strong>-</strong></div>
         <div class="chart-stat"><span>Confianza</span><strong>-</strong></div>
-        <div class="chart-stat"><span>Entrada</span><strong>-</strong></div>
+        <div class="chart-stat"><span>Predicción central</span><strong>-</strong></div>
         <div class="chart-stat"><span>Objetivo / stop</span><strong>-</strong></div>
       </div>
       <div class="decision-note" id="market-decision" aria-live="polite">
@@ -508,6 +521,7 @@ def render_operational_dashboard(
     const defaultSymbol = "{escape(default_symbol)}";
     let selectedSymbol = defaultSymbol;
     let selectedWindow = '1d';
+    let chartMode = 'line';
     let periodicTimer = null;
     let lastChartPayload = null;
     const operationStatus = document.getElementById('operation-status');
@@ -624,11 +638,18 @@ def render_operational_dashboard(
     function setSummary(payload) {{
       const levels = payload.levels || {{}};
       const signal = payload.signal || {{}};
+      const direction = signal.direction || 'NO_TRADE';
+      const directionLabel = direction === 'LONG' ? 'ALCISTA' :
+        direction === 'SHORT' ? 'BAJISTA' : 'ESPERAR';
+      const center = payload.forecast && payload.forecast.center || [];
+      const centralValue = center.length && direction !== 'NO_TRADE' ?
+        formatPrice(center[center.length - 1].value) : '-';
       const values = [
         formatPrice(payload.latest && payload.latest.close),
         formatPercent(payload.change_pct),
+        directionLabel,
         formatConfidence(signal.confidence),
-        formatPrice(levels.entry),
+        centralValue,
         `${{formatPrice(levels.target)}} / ${{formatPrice(levels.stop)}}`
       ];
       [...marketSummary.querySelectorAll('strong')].forEach((node, index) => {{
@@ -675,7 +696,22 @@ def render_operational_dashboard(
           if (index === 0) ctx.moveTo(xx, yy); else ctx.lineTo(xx, yy);
         }}); ctx.stroke(); ctx.setLineDash([]);
       }};
-      line(historical.map((item) => ({{value: item.close}})), '#087f8c');
+      const drawCandles = () => {{
+        const slotWidth = plotWidth / Math.max(1, historical.length - 1);
+        const bodyWidth = Math.max(2, Math.min(14, slotWidth * 0.62));
+        historical.forEach((item, index) => {{
+          const xx = x(index);
+          const bullish = item.close >= item.open;
+          const color = bullish ? '#16803c' : '#b42318';
+          ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = 1;
+          ctx.beginPath(); ctx.moveTo(xx, y(item.high)); ctx.lineTo(xx, y(item.low)); ctx.stroke();
+          const top = Math.min(y(item.open), y(item.close));
+          const height = Math.max(1, Math.abs(y(item.open) - y(item.close)));
+          ctx.fillRect(xx - bodyWidth / 2, top, bodyWidth, height);
+        }});
+      }};
+      if (chartMode === 'candles') drawCandles();
+      else line(historical.map((item) => ({{value: item.close}})), '#087f8c');
       if (upper.length && lower.length) {{
         ctx.beginPath(); ctx.fillStyle = 'rgba(183, 121, 31, 0.14)';
         upper.forEach((item, index) => {{ const xx = x(historical.length - 1 + index); const yy = y(item.value);
@@ -714,7 +750,13 @@ def render_operational_dashboard(
       }});
       marketMeta.textContent = 'Cargando velas, señal y escenario...';
       const response = await fetch(`/api/v1/market/${{encodeURIComponent(symbol)}}?window=${{windowValue}}`);
-      if (!response.ok) {{ marketMeta.textContent = 'No hay datos para este intervalo.'; return; }}
+      if (!response.ok) {{
+        const error = await response.json().catch(() => ({{}}));
+        marketMeta.textContent = error.detail || 'No hay datos frescos para este intervalo.';
+        marketDecision.className = 'decision-note wait';
+        marketDecision.textContent = 'Sin datos frescos: no se genera una predicción.';
+        return;
+      }}
       const payload = await response.json();
       lastChartPayload = payload;
       marketTitle.textContent = `${{payload.symbol}} · ${{payload.name}}`;
@@ -736,7 +778,8 @@ def render_operational_dashboard(
         'Rango de incertidumbre (sin dirección)' : 'Rango futuro aprox.';
       const sourceIsDemo = payload.provider === 'demo';
       marketSource.textContent = sourceIsDemo ? 'DATOS DEMO' :
-        `${{payload.source === 'provider' ? 'Proveedor' : 'Caché local'}} · ${{payload.provider}}`;
+        payload.source === 'provider' ? `DATOS EN VIVO · ${{payload.provider}}` :
+        `CACHÉ · ${{payload.provider}}`;
       marketSource.className = 'pill ' + (sourceIsDemo ? 'demo' : '');
       setSummary(payload); marketDisclaimer.textContent = payload.disclaimer;
       marketCanvas.style.display = 'block'; marketEmpty.style.display = 'none'; drawMarketChart(payload);
@@ -795,6 +838,14 @@ def render_operational_dashboard(
     }});
     document.querySelectorAll('.window-button').forEach((button) => {{
       button.addEventListener('click', () => loadMarket(selectedSymbol, button.dataset.window));
+    }});
+    document.querySelectorAll('.chart-mode-button').forEach((button) => {{
+      button.addEventListener('click', () => {{
+        chartMode = button.dataset.chartMode;
+        document.querySelectorAll('.chart-mode-button').forEach((item) =>
+          item.classList.toggle('active', item.dataset.chartMode === chartMode));
+        if (lastChartPayload) drawMarketChart(lastChartPayload);
+      }});
     }});
     window.addEventListener('resize', () => {{
       if (lastChartPayload) drawMarketChart(lastChartPayload);

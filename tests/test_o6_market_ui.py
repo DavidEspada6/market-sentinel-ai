@@ -48,6 +48,13 @@ class O6ChartProvider:
         return candles
 
 
+class UnavailableYahooProvider:
+    provider_name = "yahoo"
+
+    def historical_candles(self, symbol, timeframe, start, end):
+        return []
+
+
 class O6MarketUITests(unittest.TestCase):
     def test_chart_windows_cover_requested_filters(self) -> None:
         self.assertEqual(
@@ -120,6 +127,25 @@ class O6MarketUITests(unittest.TestCase):
             self.assertIn('id="health-status"', html)
             self.assertIn('id="market-decision"', html)
             self.assertIn('id="forecast-label"', html)
+            self.assertIn('data-chart-mode="candles"', html)
+            self.assertIn("Velas OHLC", html)
+
+    def test_live_provider_does_not_fall_back_to_unlabelled_cache(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            database = Path(directory) / "market.sqlite3"
+            settings = replace(Settings.from_env(), database_url=f"sqlite:///{database}")
+            repository = SQLiteCandleRepository(database)
+            service = MarketScanService(
+                settings,
+                repository=repository,
+                provider=UnavailableYahooProvider(),
+            )
+            response = TestClient(create_app(settings, service)).get(
+                "/api/v1/market/SPY", params={"window": "1d"}
+            )
+
+            self.assertEqual(response.status_code, 503)
+            self.assertIn("fresh yahoo market data is unavailable", response.json()["detail"])
 
 
 if __name__ == "__main__":

@@ -128,7 +128,7 @@ class Settings:
                 usage_path=_env_str("ASTRA_USAGE_PATH", "logs/astra-usage.jsonl"),
             ),
             market_data=MarketDataSettings(
-                provider=_env_str("MARKET_DATA_PROVIDER", "demo"),
+                provider=_env_str("MARKET_DATA_PROVIDER", "yahoo"),
                 api_key=_env_str("MARKET_DATA_API_KEY", ""),
                 base_url=_env_str("MARKET_DATA_BASE_URL", ""),
                 poll_seconds=_env_int("MARKET_DATA_POLL_SECONDS", 60),

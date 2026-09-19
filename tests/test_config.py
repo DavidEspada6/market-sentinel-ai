@@ -8,6 +8,12 @@ from market_sentinel_ai.config import Settings
 
 
 class SettingsTests(unittest.TestCase):
+    def test_market_data_defaults_to_live_yahoo_provider(self) -> None:
+        with patch.dict(os.environ, {}, clear=True):
+            settings = Settings.from_env()
+
+        self.assertEqual(settings.market_data.provider, "yahoo")
+
     def test_openai_is_disabled_without_api_key(self) -> None:
         with patch.dict(os.environ, {"OPENAI_API_KEY": ""}, clear=True):
             settings = Settings.from_env()
@@ -25,4 +31,3 @@ class SettingsTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

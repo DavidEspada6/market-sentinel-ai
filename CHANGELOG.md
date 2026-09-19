@@ -4,6 +4,19 @@ All notable changes to Market Sentinel AI will be documented in this file.
 
 The project follows semantic versioning once v1.0.0 is reached. Pre-1.0 releases map to the staged roadmap.
 
+## [2.7.4] - 2026-09-19
+
+### Added
+
+- Added a professional chart mode switch between close-price line and OHLC candlesticks.
+- Added a central forecast value, explicit single-direction summary and visible live-data status.
+
+### Changed
+
+- Yahoo Finance is now the default market-data provider for the operational application.
+- Live-provider failures no longer fall back silently to demo or another provider's cached candles.
+- The yellow band is documented and presented as uncertainty around the selected direction.
+
 ## [2.7.3] - 2026-09-19
 
 ### Fixed
