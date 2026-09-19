@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import unittest
 
-from market_sentinel_ai.releases import RELEASE_PLAN
+from market_sentinel_ai.releases import CURRENT_RELEASE, RELEASE_PLAN
 
 
 class ReleasePlanTests(unittest.TestCase):
@@ -15,7 +15,10 @@ class ReleasePlanTests(unittest.TestCase):
         versions = [release.version for release in RELEASE_PLAN]
         self.assertEqual(len(versions), len(set(versions)))
 
+    def test_current_release_is_r1(self) -> None:
+        self.assertEqual(CURRENT_RELEASE.code, "R1")
+        self.assertEqual(CURRENT_RELEASE.version, "0.2.0")
+
 
 if __name__ == "__main__":
     unittest.main()
-

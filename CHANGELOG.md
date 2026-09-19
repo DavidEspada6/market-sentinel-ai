@@ -4,6 +4,16 @@ All notable changes to Market Sentinel AI will be documented in this file.
 
 The project follows semantic versioning once v1.0.0 is reached. Pre-1.0 releases map to the staged roadmap.
 
+## [0.2.0] - 2026-09-19
+
+### Added
+
+- Added deterministic demo market data provider for local historical candles and live-like streams.
+- Added SQLite candle repository with idempotent upsert and range queries.
+- Added candle sequence quality validation.
+- Added CLI commands for demo ingestion and candle inspection.
+- Added tests for demo data and storage behavior.
+
 ## [0.1.0] - 2026-09-19
 
 ### Added
@@ -14,4 +24,3 @@ The project follows semantic versioning once v1.0.0 is reached. Pre-1.0 releases
 - Added release roadmap, architecture notes, risk rules, README and changelog.
 - Added unit tests for configuration, release plan and core signal behavior.
 - Added GitHub Actions CI workflow for tests.
-

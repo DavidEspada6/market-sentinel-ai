@@ -62,3 +62,4 @@ RELEASE_PLAN: tuple[Release, ...] = (
     ),
 )
 
+CURRENT_RELEASE = RELEASE_PLAN[1]

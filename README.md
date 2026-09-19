@@ -2,7 +2,7 @@
 
 Market Sentinel AI is a predictive market analysis and alerting application. Its core loop is quantitative, cheap and deterministic: market data ingestion, feature engineering, supervised models, walk-forward backtesting, risk controls and alerting. GPT-6 Astra is reserved for contextual reasoning when a signal is important enough to justify the extra cost.
 
-This repository is being built in releases. R0 is the bootstrap release: architecture, contracts, local configuration, release plan, tests and CI. It intentionally does not place live trades.
+This repository is being built in releases. R1 is the current local release: architecture, contracts, safe configuration, tests, CI, deterministic demo data and SQLite storage. It intentionally does not place live trades.
 
 ## Safety Position
 
@@ -37,6 +37,8 @@ python -m pip install -e .[dev]
 Copy-Item .env.example .env
 python -m unittest discover -s tests
 python -m market_sentinel_ai
+python -m market_sentinel_ai demo-ingest --symbol SPY --timeframe 5m --days 3
+python -m market_sentinel_ai list-candles --symbol SPY --timeframe 5m --days 3
 ```
 
 The project currently has no required runtime dependencies. Optional extras will be introduced behind stable interfaces as releases need API, ML and OpenAI functionality.
@@ -70,4 +72,3 @@ Read [docs/architecture.md](docs/architecture.md) for the module boundaries and 
 Official OpenAI documentation describes GPT-6 Astra as a high-capability reasoning model with Responses API support, structured outputs and a large context window. It is powerful, but expensive relative to local numeric models. This app therefore uses Astra as a selective reasoning layer: explain a high-conviction setup, summarize relevant context, check for contradictory news or macro context, and return structured reasoning that can be audited.
 
 The continuous market loop remains local and measurable.
-
