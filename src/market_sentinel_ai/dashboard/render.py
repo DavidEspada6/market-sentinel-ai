@@ -190,8 +190,10 @@ def render_operational_dashboard(
     generated_at_iso: str,
     environment: str,
     watchlist: list[Instrument] | None = None,
+    risk_metrics: dict[str, object] | None = None,
 ) -> str:
     watchlist = watchlist or []
+    risk_metrics = risk_metrics or {}
     signal_rows = "\n".join(_render_signal_record(signal) for signal in signals) or (
         '<tr><td colspan="6">No persisted signals</td></tr>'
     )
@@ -261,6 +263,10 @@ def render_operational_dashboard(
           "Actionable signals",
           str(sum(signal.direction.value != "NO_TRADE" for signal in signals))
       )}
+      {_operational_metric("Estimated PnL", _format_money(risk_metrics.get("estimated_pnl")))}
+      {_operational_metric("Realized PnL", _format_money(risk_metrics.get("realized_pnl")))}
+      {_operational_metric("VaR 95%", _format_money(risk_metrics.get("var_95")))}
+      {_operational_metric("Max Drawdown", _format_percent(risk_metrics.get("max_drawdown_pct")))}
     </div>
     <section><div class="panel"><h2>Watchlist</h2>
       <form class="searchbar" id="instrument-search">
@@ -410,3 +416,11 @@ def _render_instrument_row(instrument: Instrument) -> str:
         f'data-symbol="{escape(instrument.symbol)}">Remove</button></td>'
         "</tr>"
     )
+
+
+def _format_money(value: object) -> str:
+    return "-" if not isinstance(value, (float, int)) else f"{value:,.2f}"
+
+
+def _format_percent(value: object) -> str:
+    return "-" if not isinstance(value, (float, int)) else f"{value:.2f}%"

@@ -4,6 +4,22 @@ All notable changes to Market Sentinel AI will be documented in this file.
 
 The project follows semantic versioning once v1.0.0 is reached. Pre-1.0 releases map to the staged roadmap.
 
+## [2.4.0] - 2026-09-19
+
+### Added
+
+- Added paper risk analytics for estimated, realized and unrealized PnL.
+- Added historical VaR and CVaR with confidence, method and sample size fields.
+- Added volatility, Sharpe, Sortino, maximum drawdown, profit factor, win rate, expectancy and
+  exposure metrics.
+- Added `/api/v1/paper/metrics` and dashboard metric panels.
+- Added O4 tests for risk calculations and API exposure.
+
+### Changed
+
+- Promoted the operational product track to O4 `2.4.0`.
+- Kept unrealized PnL explicitly zero until the paper ledger supports open positions and valuation.
+
 ## [2.3.0] - 2026-09-19
 
 ### Added

@@ -10,6 +10,7 @@ from market_sentinel_ai.adapters.market_data import (
     MarketDataProviderError,
     build_instrument_search_provider,
 )
+from market_sentinel_ai.analytics import calculate_risk_metrics
 from market_sentinel_ai.config import Settings
 from market_sentinel_ai.dashboard import render_operational_dashboard
 from market_sentinel_ai.domain.instruments import (
@@ -242,6 +243,22 @@ def create_app(
             for record in repository.list_paper_trades(account_id, limit)
         ]
 
+    @app.get("/api/v1/paper/metrics")
+    def paper_metrics(
+        account_id: str = "default",
+        limit: int = Query(default=500, ge=1, le=5000),
+    ) -> dict[str, object]:
+        snapshot = repository.load_paper_account(account_id)
+        starting_equity = snapshot.starting_equity if snapshot else 100_000.0
+        records = repository.list_paper_trades(account_id, limit)
+        metrics = calculate_risk_metrics(
+            [record.trade for record in records],
+            repository.list_signals(limit=limit),
+            starting_equity=starting_equity,
+            max_position_pct=active_settings.risk.max_position_pct,
+        )
+        return {"account_id": account_id, **metrics.to_dict()}
+
     @app.get("/api/v1/drift")
     def drift_reports(limit: int = Query(default=50, ge=1, le=500)) -> list[dict[str, object]]:
         return repository.list_drift_reports(limit)
@@ -261,12 +278,20 @@ def create_app(
 
     @app.get("/", response_class=HTMLResponse)
     def dashboard() -> str:
+        snapshot = repository.load_paper_account("default")
+        metrics = calculate_risk_metrics(
+            [record.trade for record in repository.list_paper_trades("default")],
+            repository.list_signals(limit=500),
+            starting_equity=snapshot.starting_equity if snapshot else 100_000.0,
+            max_position_pct=active_settings.risk.max_position_pct,
+        ).to_dict()
         return render_operational_dashboard(
             repository.list_signals(limit=50),
             repository.list_alerts(limit=50),
             generated_at_iso=datetime.now(tz=UTC).isoformat(),
             environment=active_settings.environment,
             watchlist=repository.list_watchlist(),
+            risk_metrics=metrics,
         )
 
     return app

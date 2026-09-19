@@ -29,6 +29,8 @@ The default binding is local-only. The service does not place real orders.
 - GET /api/v1/astra-usage lists today's request, cache, token and estimated-cost counters.
 - GET /api/v1/paper/account returns the recovered paper equity state.
 - GET /api/v1/paper/trades lists persisted simulated trades.
+- GET /api/v1/paper/metrics returns estimated, realized and unrealized PnL, historical VaR/CVaR,
+  volatility, Sharpe, Sortino, drawdown, profit factor, win rate, expectancy and exposure.
 - GET /api/v1/drift lists persisted feature-drift reports.
 - GET /api/v1/health/details runs and persists a database/application health check.
 - GET /api/v1/health/history lists previous health checks.

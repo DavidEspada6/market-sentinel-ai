@@ -90,6 +90,9 @@ class O1UniverseWatchlistTests(unittest.TestCase):
             self.assertEqual(scan.status_code, 200)
             self.assertGreaterEqual(scan.json()["run"]["signal_count"], 14)
             self.assertIn("plan_action", client.get("/api/v1/signals").json()[0]["metadata"])
+            metrics = client.get("/api/v1/paper/metrics")
+            self.assertEqual(metrics.status_code, 200)
+            self.assertIn("var_95", metrics.json())
             self.assertFalse(client.get("/api/v1/status").json()["real_orders_enabled"])
             self.assertEqual(removed.status_code, 200)
 
