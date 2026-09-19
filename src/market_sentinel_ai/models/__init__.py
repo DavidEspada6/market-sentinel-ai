@@ -4,6 +4,7 @@ from market_sentinel_ai.models.boosting import (
     OptionalDependencyMissingError,
     XGBoostDirectionalModel,
 )
+from market_sentinel_ai.models.ensemble import WeightedEnsembleModel, WeightedModel
 from market_sentinel_ai.models.supervised import LogisticDirectionalModel
 
 __all__ = [
@@ -11,5 +12,7 @@ __all__ = [
     "LogisticDirectionalModel",
     "MomentumBaselineModel",
     "OptionalDependencyMissingError",
+    "WeightedEnsembleModel",
+    "WeightedModel",
     "XGBoostDirectionalModel",
 ]

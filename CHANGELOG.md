@@ -4,6 +4,18 @@ All notable changes to Market Sentinel AI will be documented in this file.
 
 The project follows semantic versioning once v1.0.0 is reached. Pre-1.0 releases map to the staged roadmap.
 
+## [0.6.0] - 2026-09-19
+
+### Added
+
+- Added order-book domain objects and deterministic demo order-book snapshots.
+- Added order-flow feature engine for spread, imbalance and depth.
+- Added multi-timeframe candle aggregation.
+- Added weighted ensemble model abstraction.
+- Added volatility regime detector.
+- Added CLI command for ensemble/regime/order-flow demo.
+- Added tests for R5 order-flow, multi-timeframe aggregation, ensemble and regime behavior.
+
 ## [0.5.0] - 2026-09-19
 
 ### Added

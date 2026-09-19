@@ -5,15 +5,21 @@ import json
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-from market_sentinel_ai.adapters.market_data import DemoMarketDataProvider
+from market_sentinel_ai.adapters.market_data import DemoMarketDataProvider, DemoOrderBookProvider
 from market_sentinel_ai.alerts import DryRunAlertChannel
 from market_sentinel_ai.backtesting import SimpleBacktestEngine
 from market_sentinel_ai.config import Settings
 from market_sentinel_ai.dashboard import DashboardViewModel, render_dashboard
 from market_sentinel_ai.domain.market import Timeframe
-from market_sentinel_ai.features import OHLCVFeatureEngine
+from market_sentinel_ai.features import OHLCVFeatureEngine, OrderFlowFeatureEngine, aggregate_candles
 from market_sentinel_ai.ml import WalkForwardEvaluator, WalkForwardSplit, build_directional_examples
-from market_sentinel_ai.models import LogisticDirectionalModel, MomentumBaselineModel
+from market_sentinel_ai.models import (
+    LogisticDirectionalModel,
+    MomentumBaselineModel,
+    WeightedEnsembleModel,
+    WeightedModel,
+)
+from market_sentinel_ai.regime import VolatilityRegimeDetector
 from market_sentinel_ai.releases import CURRENT_RELEASE, RELEASE_PLAN
 from market_sentinel_ai.signals import SignalEngine
 from market_sentinel_ai.storage import SQLiteCandleRepository, sqlite_path_from_url
@@ -57,6 +63,11 @@ def main() -> None:
     dashboard.add_argument("--days", type=int, default=30)
     dashboard.add_argument("--output", default="reports/dashboard.html")
 
+    ensemble = subparsers.add_parser("ensemble-demo")
+    ensemble.add_argument("--symbol", default="SPY")
+    ensemble.add_argument("--timeframe", choices=[item.value for item in Timeframe], default="5m")
+    ensemble.add_argument("--days", type=int, default=20)
+
     args = parser.parse_args()
     command = args.command or "status"
     settings = Settings.from_env()
@@ -86,6 +97,9 @@ def main() -> None:
         return
     if command == "dashboard-demo":
         _dashboard_demo(settings, args.symbol, Timeframe(args.timeframe), args.days, args.output)
+        return
+    if command == "ensemble-demo":
+        _ensemble_demo(args.symbol, Timeframe(args.timeframe), args.days)
         return
     parser.error(f"unknown command: {command}")
 
@@ -280,19 +294,43 @@ def _demo_signal(settings: Settings, symbol: str, timeframe: Timeframe, days: in
         min_probability=0.52,
         min_expected_return_bps=settings.risk.default_fee_bps + settings.risk.default_slippage_bps,
     ).from_prediction(prediction)
-    report = evaluator.evaluate(examples)
+
+
+def _ensemble_demo(symbol: str, timeframe: Timeframe, days: int) -> None:
+    end = datetime.now(tz=UTC).replace(second=0, microsecond=0)
+    start = end - timedelta(days=days)
+    provider = DemoMarketDataProvider()
+    candles = list(provider.historical_candles(symbol, timeframe, start, end))
+    feature_engine = OHLCVFeatureEngine(rolling_window=20)
+    features = feature_engine.transform(candles)
+    examples = build_directional_examples(candles, feature_engine, horizon_candles=1)
+
+    logistic = LogisticDirectionalModel(horizon_minutes=5, epochs=75)
+    logistic.fit(examples[:-1])
+    ensemble = WeightedEnsembleModel(
+        models=(
+            WeightedModel(MomentumBaselineModel(horizon_minutes=5, momentum_threshold_bps=0.5), 0.4),
+            WeightedModel(logistic, 0.6),
+        ),
+        horizon_minutes=5,
+    )
+    prediction = ensemble.predict(features)
+    regime = VolatilityRegimeDetector().detect(features)
+    higher_timeframe = aggregate_candles(candles, Timeframe.FIFTEEN_MINUTES)
+    order_flow_rows = OrderFlowFeatureEngine().transform(
+        list(DemoOrderBookProvider().snapshots_from_candles(candles[-5:]))
+    )
     print(
         json.dumps(
             {
-                "symbol": symbol.upper(),
-                "timeframe": timeframe.value,
-                "days": days,
-                "examples": len(examples),
-                "folds": len(report.folds),
-                "average_accuracy": report.average_accuracy,
-                "average_precision": report.average_precision,
-                "average_recall": report.average_recall,
-                "average_coverage": report.average_coverage,
+                "symbol": prediction.symbol,
+                "direction": prediction.direction.value,
+                "probability": prediction.probability,
+                "model": prediction.model_name,
+                "regime": regime.value,
+                "source_candles": len(candles),
+                "fifteen_minute_candles": len(higher_timeframe),
+                "latest_order_flow": order_flow_rows[-1].values if order_flow_rows else {},
             },
             indent=2,
             sort_keys=True,
