@@ -4,6 +4,13 @@ All notable changes to Market Sentinel AI will be documented in this file.
 
 The project follows semantic versioning once v1.0.0 is reached. Pre-1.0 releases map to the staged roadmap.
 
+## [2.8.1] - 2026-09-19
+
+### Fixed
+
+- Aligned the adaptive model's displayed prediction horizon with its three-candle forward label;
+  the momentum fallback keeps its original one-candle horizon.
+
 ## [2.8.0] - 2026-09-19
 
 ### Added

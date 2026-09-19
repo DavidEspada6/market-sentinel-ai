@@ -115,7 +115,8 @@ class MarketScanService:
         if not candles:
             raise ValueError("candles cannot be empty")
         features = OHLCVFeatureEngine().transform(candles)
-        horizon_minutes = _timeframe_minutes(timeframe)
+        candle_minutes = _timeframe_minutes(timeframe)
+        horizon_minutes = candle_minutes * 3
         key = (candles[-1].symbol, timeframe.value)
         signature = (len(candles), candles[-1].opened_at.isoformat(), round_trip_cost_bps)
         cached = self._adaptive_models.get(key)
@@ -153,7 +154,7 @@ class MarketScanService:
 
         if model is not None:
             return model.predict(features), features
-        return MomentumBaselineModel(horizon_minutes=horizon_minutes).predict(features), features
+        return MomentumBaselineModel(horizon_minutes=candle_minutes).predict(features), features
 
     def model_status(self) -> list[dict[str, str | float | int | bool]]:
         return [dict(self._model_status[key]) for key in sorted(self._model_status)]
