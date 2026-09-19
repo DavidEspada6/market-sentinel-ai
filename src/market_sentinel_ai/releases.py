@@ -196,7 +196,7 @@ FOLLOW_ON_PLAN: tuple[Release, ...] = (
     ),
     Release(
         code="O9",
-        version="2.9.0",
+        version="2.9.1",
         title="Leveraged Simulation Workspace",
         objective=(
             "Add a persistent mark-to-market simulator with configurable capital, LONG/SHORT "

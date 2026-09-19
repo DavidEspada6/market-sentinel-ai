@@ -4,6 +4,13 @@ All notable changes to Market Sentinel AI will be documented in this file.
 
 The project follows semantic versioning once v1.0.0 is reached. Pre-1.0 releases map to the staged roadmap.
 
+## [2.9.1] - 2026-09-19
+
+### Added
+
+- Added simulation-specific realized PnL, exposure, VaR 95%, CVaR 95% and maximum drawdown
+  cards to the visual workspace.
+
 ## [2.9.0] - 2026-09-19
 
 ### Added

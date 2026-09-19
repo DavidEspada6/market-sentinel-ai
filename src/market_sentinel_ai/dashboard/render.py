@@ -551,7 +551,12 @@ def render_operational_dashboard(
         <div class="simulation-account-item"><span>Equity</span><strong id="sim-equity">-</strong></div>
         <div class="simulation-account-item"><span>Margen disponible</span><strong id="sim-available-margin">-</strong></div>
         <div class="simulation-account-item"><span>PnL no realizado</span><strong id="sim-unrealized-pnl">-</strong></div>
+        <div class="simulation-account-item"><span>PnL realizado</span><strong id="sim-realized-pnl">-</strong></div>
         <div class="simulation-account-item"><span>PnL total</span><strong id="sim-total-pnl">-</strong></div>
+        <div class="simulation-account-item"><span>Exposición</span><strong id="sim-exposure">-</strong></div>
+        <div class="simulation-account-item"><span>VaR 95%</span><strong id="sim-var95">-</strong></div>
+        <div class="simulation-account-item"><span>CVaR 95%</span><strong id="sim-cvar95">-</strong></div>
+        <div class="simulation-account-item"><span>Max drawdown</span><strong id="sim-max-drawdown">-</strong></div>
       </div>
       <div class="simulation-controls">
         <label class="control-field">Activo seleccionado
@@ -772,13 +777,19 @@ def render_operational_dashboard(
       row.appendChild(cell);
     }}
 
-    function renderSimulationAccount(account, trades) {{
+    function renderSimulationAccount(account, trades, metrics) {{
       document.getElementById('sim-starting-equity').textContent = formatMoneyValue(account.starting_equity);
       document.getElementById('sim-cash-balance').textContent = formatMoneyValue(account.cash_balance);
       document.getElementById('sim-equity').textContent = formatMoneyValue(account.equity);
       document.getElementById('sim-available-margin').textContent = formatMoneyValue(account.available_margin);
       document.getElementById('sim-unrealized-pnl').textContent = formatSimulationPnl(account.unrealized_pnl);
+      document.getElementById('sim-realized-pnl').textContent = formatSimulationPnl(account.realized_pnl);
       document.getElementById('sim-total-pnl').textContent = formatSimulationPnl(account.total_pnl);
+      document.getElementById('sim-exposure').textContent = formatMoneyValue(account.exposure);
+      document.getElementById('sim-var95').textContent = formatMoneyValue(metrics && metrics.var_95);
+      document.getElementById('sim-cvar95').textContent = formatMoneyValue(metrics && metrics.cvar_95);
+      document.getElementById('sim-max-drawdown').textContent = metrics ?
+        `${{Number(metrics.max_drawdown_pct || 0).toFixed(2)}}%` : '-';
       const positionsRows = document.getElementById('sim-positions-rows');
       positionsRows.replaceChildren();
       if (!account.positions || !account.positions.length) {{
@@ -823,14 +834,15 @@ def render_operational_dashboard(
     }}
 
     async function loadSimulation() {{
-      const [account, trades] = await Promise.all([
-        fetchJson('/api/v1/simulation/account'), fetchJson('/api/v1/simulation/trades?limit=50')
+      const [account, trades, metrics] = await Promise.all([
+        fetchJson('/api/v1/simulation/account'), fetchJson('/api/v1/simulation/trades?limit=50'),
+        fetchJson('/api/v1/simulation/metrics')
       ]);
       if (!account) {{
         setSimulationStatus('No se pudo cargar la cuenta de simulación.');
         return;
       }}
-      renderSimulationAccount(account, trades || []);
+      renderSimulationAccount(account, trades || [], metrics);
       const refreshed = account.prices_refreshed && account.prices_refreshed.length;
       setSimulationStatus(refreshed ?
         `Mercado actualizado para: ${{account.prices_refreshed.join(', ')}} · apalancamiento máximo ${{account.max_leverage}}x.` :

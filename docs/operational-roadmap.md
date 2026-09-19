@@ -13,7 +13,7 @@ releases make it a practical daily analysis tool while keeping paper trading as 
 | O6 | 2.6.0 | Complete | Interactive color dashboard, chart windows, future scenarios and visual risk levels |
 | O7 | 2.7.4 | Complete | Complete UI control center for scanning, paper metrics and diagnostics |
 | O8 | 2.8.2 | Complete | Adaptive predictions, directional watchlist zones and interactive chart inspection |
-| O9 | 2.9.0 | Current | Leveraged LONG/SHORT simulation with persistent mark-to-market PnL |
+| O9 | 2.9.1 | Current | Leveraged LONG/SHORT simulation with persistent mark-to-market PnL and risk cards |
 | O10 | 3.0.0 | Optional | Broker integration only after explicit approval and a separate security review |
 
 ## What "operational" means
