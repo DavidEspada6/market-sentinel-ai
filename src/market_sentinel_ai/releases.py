@@ -205,12 +205,12 @@ FOLLOW_ON_PLAN: tuple[Release, ...] = (
     ),
     Release(
         code="O10",
-        version="2.10.1",
+        version="2.10.2",
         title="Continuous Prediction Evaluation And Analytics",
         objective=(
             "Persist and evaluate predictions across the watchlist, pause exchange-traded assets "
             "outside their weekend sessions, expose accuracy analytics and retain detailed "
-            "simulation trade history."
+            "simulation trade history with automatic stop-loss and take-profit exits."
         ),
     ),
     Release(

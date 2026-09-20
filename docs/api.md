@@ -50,7 +50,10 @@ The default binding is local-only. The service does not place real orders.
 - POST /api/v1/simulation/reset starts a new simulation account with `starting_equity`; it is
   refused while positions are open.
 - POST /api/v1/simulation/positions opens a LONG or SHORT simulated position. Its JSON body accepts
-  `symbol`, `direction`, `margin`, `leverage` from 1x to 10x and an optional current `price`.
+  `symbol`, `direction`, `margin`, `leverage` from 1x to 10x, an optional current `price`, and
+  optional `stop_loss` and `take_profit` levels. LONG stops must be below entry and targets above;
+  SHORT stops must be above entry and targets below. A refreshed provider price closes the position
+  automatically when it reaches either level.
 - POST /api/v1/simulation/positions/{position_id}/close closes a local position at an optional
   supplied price or the latest provider price.
 - GET /api/v1/simulation/trades lists closed simulation trades; GET /api/v1/simulation/metrics

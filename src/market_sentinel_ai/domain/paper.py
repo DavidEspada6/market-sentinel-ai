@@ -20,6 +20,8 @@ class PaperPosition:
     entry_cost: float
     opened_at: datetime
     updated_at: datetime
+    stop_loss: float | None = None
+    take_profit: float | None = None
 
     @property
     def notional(self) -> float:

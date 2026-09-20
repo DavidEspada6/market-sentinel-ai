@@ -62,12 +62,16 @@ class SimulationTests(unittest.TestCase):
                     "margin": 1_000,
                     "leverage": 3,
                     "price": 100,
+                    "stop_loss": 95,
+                    "take_profit": 110,
                 },
             )
             self.assertEqual(opened.status_code, 200)
             position = opened.json()["position"]
             self.assertEqual(position["direction"], "LONG")
             self.assertEqual(position["leverage"], 3)
+            self.assertEqual(position["stop_loss"], 95)
+            self.assertEqual(position["take_profit"], 110)
 
             account = client.get("/api/v1/simulation/account")
             self.assertEqual(account.status_code, 200)
@@ -118,6 +122,51 @@ class SimulationTests(unittest.TestCase):
         self.assertFalse(ledger.positions)
         self.assertEqual(len(ledger.trades), 1)
         self.assertLess(ledger.trades[0].pnl, -900)
+
+    def test_stop_loss_and_take_profit_auto_close_and_persist(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            repository = SQLiteCandleRepository(Path(directory) / "market.sqlite3")
+            ledger = SimulationLedger(starting_equity=10_000, store=repository)
+            ledger.open_position(
+                symbol="AAPL",
+                direction=Direction.LONG,
+                margin=1_000,
+                leverage=2,
+                entry_price=100,
+                stop_loss=95,
+                take_profit=105,
+            )
+            recovered = SimulationLedger(starting_equity=1, store=repository)
+            self.assertEqual(recovered.positions[0].stop_loss, 95)
+            self.assertEqual(recovered.positions[0].take_profit, 105)
+
+            recovered.refresh_prices({"AAPL": 105})
+            self.assertFalse(recovered.positions)
+            self.assertEqual(recovered.trades[0].close_reason, "take_profit")
+            self.assertEqual(repository.list_paper_positions("simulation"), [])
+
+            recovered.open_position(
+                symbol="AAPL",
+                direction=Direction.SHORT,
+                margin=1_000,
+                leverage=2,
+                entry_price=100,
+                stop_loss=105,
+                take_profit=95,
+            )
+            recovered.refresh_prices({"AAPL": 105})
+            self.assertFalse(recovered.positions)
+            self.assertEqual(recovered.trades[-1].close_reason, "stop_loss")
+
+            with self.assertRaises(ValueError):
+                recovered.open_position(
+                    symbol="AAPL",
+                    direction=Direction.LONG,
+                    margin=100,
+                    leverage=1,
+                    entry_price=100,
+                    stop_loss=101,
+                )
 
 
 if __name__ == "__main__":

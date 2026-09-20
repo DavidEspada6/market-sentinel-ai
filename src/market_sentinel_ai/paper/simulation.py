@@ -103,6 +103,8 @@ class SimulationLedger:
         leverage: float,
         entry_price: float,
         opened_at: datetime | None = None,
+        stop_loss: float | None = None,
+        take_profit: float | None = None,
     ) -> PaperPosition:
         normalized_symbol = symbol.strip().upper()
         if not normalized_symbol:
@@ -115,6 +117,20 @@ class SimulationLedger:
             raise SimulationError(f"leverage must be between 1x and {self.MAX_LEVERAGE:g}x")
         if entry_price <= 0:
             raise SimulationError("entry_price must be positive")
+        if stop_loss is not None and stop_loss <= 0:
+            raise SimulationError("stop_loss must be positive")
+        if take_profit is not None and take_profit <= 0:
+            raise SimulationError("take_profit must be positive")
+        if direction is Direction.LONG:
+            if stop_loss is not None and stop_loss >= entry_price:
+                raise SimulationError("LONG stop_loss must be below entry_price")
+            if take_profit is not None and take_profit <= entry_price:
+                raise SimulationError("LONG take_profit must be above entry_price")
+        else:
+            if stop_loss is not None and stop_loss <= entry_price:
+                raise SimulationError("SHORT stop_loss must be above entry_price")
+            if take_profit is not None and take_profit >= entry_price:
+                raise SimulationError("SHORT take_profit must be below entry_price")
         if margin > self.available_margin:
             raise SimulationError(
                 f"insufficient available margin ({self.available_margin:.2f})"
@@ -138,6 +154,8 @@ class SimulationLedger:
             entry_cost=entry_cost,
             opened_at=timestamp,
             updated_at=timestamp,
+            stop_loss=stop_loss,
+            take_profit=take_profit,
         )
         self.positions.append(position)
         self.cash -= entry_cost
@@ -170,7 +188,25 @@ class SimulationLedger:
             price = prices.get(position.symbol)
             if price is not None and price > 0:
                 updated = self.mark_price(position.position_id, price, timestamp)
-                if (
+                close_reason: str | None = None
+                if updated.direction is Direction.LONG:
+                    if updated.stop_loss is not None and price <= updated.stop_loss:
+                        close_reason = "stop_loss"
+                    elif updated.take_profit is not None and price >= updated.take_profit:
+                        close_reason = "take_profit"
+                else:
+                    if updated.stop_loss is not None and price >= updated.stop_loss:
+                        close_reason = "stop_loss"
+                    elif updated.take_profit is not None and price <= updated.take_profit:
+                        close_reason = "take_profit"
+                if close_reason is not None:
+                    self.close_position(
+                        updated.position_id,
+                        price,
+                        timestamp,
+                        close_reason=close_reason,
+                    )
+                elif (
                     self.position_unrealized_pnl(updated)
                     <= -updated.margin * self.LIQUIDATION_BUFFER
                 ):

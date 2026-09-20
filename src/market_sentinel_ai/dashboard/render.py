@@ -601,6 +601,10 @@ def render_operational_dashboard(
           <select id="sim-leverage"><option value="1">1x</option><option value="2">2x</option>
             <option value="3">3x</option><option value="5" selected>5x</option><option value="10">10x</option></select>
         </label>
+        <label class="control-field">Stop-loss
+          <input id="sim-stop-loss" type="number" min="0" step="0.000001" placeholder="Opcional"></label>
+        <label class="control-field">Objetivo
+          <input id="sim-take-profit" type="number" min="0" step="0.000001" placeholder="Opcional"></label>
         <div class="control-field"><span>Dirección</span>
           <div class="simulation-direction"><button type="button" id="sim-long" class="active-long">LONG</button>
             <button type="button" id="sim-short">SHORT</button></div>
@@ -611,12 +615,13 @@ def render_operational_dashboard(
         <button type="button" class="secondary" id="sim-reset">Reiniciar simulación</button>
       </div>
       <div class="simulation-note" id="sim-status" aria-live="polite">
-        Selecciona un activo y abre una posición simulada. La cuenta se actualiza periódicamente.
+        Selecciona un activo, fija opcionalmente stop-loss y objetivo, y abre una posición simulada.
+        La cuenta se actualiza periódicamente y cierra automáticamente al tocar esos niveles.
       </div>
       <div class="simulation-positions"><h3>Posiciones abiertas</h3>
         <table><thead><tr><th>Activo</th><th>Dirección</th><th>Margen</th><th>Apalancamiento</th>
-          <th>Entrada</th><th>Precio actual</th><th>PnL</th><th>Liquidación aprox.</th><th></th></tr></thead>
-          <tbody id="sim-positions-rows"><tr><td colspan="9" class="muted">No hay posiciones abiertas.</td></tr></tbody></table>
+          <th>Entrada</th><th>Precio actual</th><th>PnL</th><th>Stop-loss</th><th>Objetivo</th><th>Liquidación aprox.</th><th></th></tr></thead>
+          <tbody id="sim-positions-rows"><tr><td colspan="11" class="muted">No hay posiciones abiertas.</td></tr></tbody></table>
       </div>
       <div class="simulation-positions"><h3>Historial de simulación</h3>
         <table><thead><tr><th>Activo</th><th>Dirección</th><th>Margen</th><th>Apalancamiento</th><th>Entrada</th><th>Salida</th><th>Costes</th><th>PnL</th><th>Motivo</th><th>Cierre</th></tr></thead>
@@ -843,7 +848,7 @@ def render_operational_dashboard(
       const positionsRows = document.getElementById('sim-positions-rows');
       positionsRows.replaceChildren();
       if (!account.positions || !account.positions.length) {{
-        positionsRows.innerHTML = '<tr><td colspan="9" class="muted">No hay posiciones abiertas.</td></tr>';
+        positionsRows.innerHTML = '<tr><td colspan="11" class="muted">No hay posiciones abiertas.</td></tr>';
       }} else {{
         account.positions.forEach((position) => {{
           const row = document.createElement('tr');
@@ -855,6 +860,8 @@ def render_operational_dashboard(
           appendSimulationCell(row, formatPrice(position.mark_price));
           appendSimulationCell(row, formatSimulationPnl(position.unrealized_pnl),
             position.unrealized_pnl >= 0 ? 'simulation-pnl-positive' : 'simulation-pnl-negative');
+          appendSimulationCell(row, formatPrice(position.stop_loss));
+          appendSimulationCell(row, formatPrice(position.take_profit));
           appendSimulationCell(row, formatPrice(position.liquidation_price));
           const actionCell = document.createElement('td');
           const closeButton = document.createElement('button');
@@ -1371,12 +1378,17 @@ def render_operational_dashboard(
       if (!symbol) {{ setSimulationStatus('Selecciona un activo antes de abrir una posición.'); return; }}
       const margin = Number(document.getElementById('sim-margin').value);
       const leverage = Number(document.getElementById('sim-leverage').value);
+      const stopLossValue = document.getElementById('sim-stop-loss').value;
+      const takeProfitValue = document.getElementById('sim-take-profit').value;
+      const stopLoss = stopLossValue ? Number(stopLossValue) : undefined;
+      const takeProfit = takeProfitValue ? Number(takeProfitValue) : undefined;
       const currentPrice = lastChartPayload && lastChartPayload.symbol === symbol ?
         lastChartPayload.latest.close : undefined;
       setSimulationStatus('Abriendo posición simulada...');
       const response = await fetch('/api/v1/simulation/positions', {{
         method: 'POST', headers: {{'Content-Type': 'application/json'}},
-        body: JSON.stringify({{symbol, direction: simulationDirection, margin, leverage, price: currentPrice}})
+        body: JSON.stringify({{symbol, direction: simulationDirection, margin, leverage, price: currentPrice,
+          stop_loss: stopLoss, take_profit: takeProfit}})
       }});
       const payload = await response.json().catch(() => ({{}}));
       if (!response.ok) {{ setSimulationStatus(payload.detail || 'No se pudo abrir la posición.'); return; }}

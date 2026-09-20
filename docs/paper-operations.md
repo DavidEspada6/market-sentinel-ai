@@ -23,10 +23,14 @@ restore them only while the application is stopped and after checking the file p
 ## Interactive simulation
 
 The dashboard's **Modo simulación** uses a separate `simulation` account. Set the starting capital,
-select the asset, choose the margin and leverage, then open a `LONG` or `SHORT` position. The
-application marks open positions with provider prices approximately every 15 seconds while the UI
-is open and updates cash balance, equity, margin, exposure and unrealized PnL. Closing a position
-records a simulated trade with fees, spread and slippage from the risk configuration.
+select the asset, choose the margin and leverage, optionally set a stop-loss and take-profit target,
+then open a `LONG` or `SHORT` position. The application marks open positions with provider prices
+approximately every 15 seconds while the UI is open and updates cash balance, equity, margin,
+exposure and unrealized PnL. A LONG stop must be below entry and its target above; a SHORT stop must
+be above entry and its target below. When a refreshed provider price reaches one of those levels,
+the position is closed automatically and the persisted trade records `stop_loss` or `take_profit`
+as its close reason. Manual closing records a simulated trade with fees, spread and slippage from
+the risk configuration.
 
 The simulator is deliberately bounded to 1x-10x leverage, refuses margin above the available
 equity and exposes an approximate liquidation price for each position. If a refreshed market price

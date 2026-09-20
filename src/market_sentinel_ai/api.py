@@ -70,6 +70,8 @@ class SimulationPositionRequest(BaseModel):
     margin: float = Field(gt=0, le=1_000_000_000)
     leverage: float = Field(default=1.0, ge=1.0, le=10.0)
     price: float | None = Field(default=None, gt=0)
+    stop_loss: float | None = Field(default=None, gt=0)
+    take_profit: float | None = Field(default=None, gt=0)
 
 
 class SimulationCloseRequest(BaseModel):
@@ -217,6 +219,8 @@ def create_app(
             "mark_price": position.mark_price,
             "leverage": position.leverage,
             "margin": position.margin,
+            "stop_loss": position.stop_loss,
+            "take_profit": position.take_profit,
             "notional": position.mark_notional,
             "unrealized_pnl": ledger.position_unrealized_pnl(position),
             "liquidation_price": ledger.liquidation_price(position),
@@ -776,6 +780,8 @@ def create_app(
                 margin=request.margin,
                 leverage=request.leverage,
                 entry_price=price,
+                stop_loss=request.stop_loss,
+                take_profit=request.take_profit,
             )
         except SimulationError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc

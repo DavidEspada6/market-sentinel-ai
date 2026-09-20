@@ -4,6 +4,15 @@ All notable changes to Market Sentinel AI will be documented in this file.
 
 The project follows semantic versioning once v1.0.0 is reached. Pre-1.0 releases map to the staged roadmap.
 
+## [2.10.2] - 2026-09-20
+
+### Added
+
+- Added optional stop-loss and take-profit levels to leveraged simulation positions.
+- Persisted open-position protection levels across restarts and automatically closed positions when
+  a refreshed market price reached a configured level, recording the close reason.
+- Added stop-loss and objective inputs and columns to the simulation workspace.
+
 ## [2.10.1] - 2026-09-19
 
 ### Fixed

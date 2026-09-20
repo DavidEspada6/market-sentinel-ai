@@ -7,8 +7,8 @@ releases and ended at v2.0.0. The follow-on operational track is documented in
 [operational-roadmap.md](operational-roadmap.md).
 
 The operational track now includes O10, which adds continuous prediction evaluation, filterable
-accuracy analytics and detailed simulation history while keeping broker execution separate and
-disabled. Broker execution remains a separate O11 review.
+accuracy analytics, detailed simulation history and automatic simulation exits while keeping broker
+execution separate and disabled. Broker execution remains a separate O11 review.
 
 | Release | Version | Deliverable |
 | --- | --- | --- |

@@ -180,7 +180,9 @@ CREATE TABLE IF NOT EXISTS paper_positions (
     margin REAL NOT NULL,
     entry_cost REAL NOT NULL,
     opened_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL
+    updated_at TEXT NOT NULL,
+    stop_loss REAL,
+    take_profit REAL
 );
 
 CREATE INDEX IF NOT EXISTS idx_paper_positions_account_updated_at
@@ -850,11 +852,14 @@ class SQLiteCandleRepository:
                 """
                 INSERT INTO paper_positions (
                     position_id, account_id, symbol, direction, quantity, entry_price,
-                    mark_price, leverage, margin, entry_cost, opened_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    mark_price, leverage, margin, entry_cost, opened_at, updated_at,
+                    stop_loss, take_profit
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(position_id) DO UPDATE SET
                     mark_price = excluded.mark_price,
-                    updated_at = excluded.updated_at
+                    updated_at = excluded.updated_at,
+                    stop_loss = excluded.stop_loss,
+                    take_profit = excluded.take_profit
                 """,
                 (
                     position.position_id,
@@ -869,6 +874,8 @@ class SQLiteCandleRepository:
                     position.entry_cost,
                     position.opened_at.isoformat(),
                     position.updated_at.isoformat(),
+                    position.stop_loss,
+                    position.take_profit,
                 ),
             )
 
@@ -877,7 +884,8 @@ class SQLiteCandleRepository:
             rows = connection.execute(
                 """
                 SELECT position_id, account_id, symbol, direction, quantity, entry_price,
-                       mark_price, leverage, margin, entry_cost, opened_at, updated_at
+                       mark_price, leverage, margin, entry_cost, opened_at, updated_at,
+                       stop_loss, take_profit
                 FROM paper_positions
                 WHERE account_id = ?
                 ORDER BY opened_at ASC
@@ -898,6 +906,8 @@ class SQLiteCandleRepository:
                 entry_cost=row["entry_cost"],
                 opened_at=datetime.fromisoformat(row["opened_at"]),
                 updated_at=datetime.fromisoformat(row["updated_at"]),
+                stop_loss=row["stop_loss"],
+                take_profit=row["take_profit"],
             )
             for row in rows
         ]
@@ -1074,6 +1084,17 @@ class SQLiteCandleRepository:
             }
             for column, statement in migrations.items():
                 if column not in existing_columns:
+                    connection.execute(statement)
+            existing_position_columns = {
+                row["name"]
+                for row in connection.execute("PRAGMA table_info(paper_positions)").fetchall()
+            }
+            position_migrations = {
+                "stop_loss": "ALTER TABLE paper_positions ADD COLUMN stop_loss REAL",
+                "take_profit": "ALTER TABLE paper_positions ADD COLUMN take_profit REAL",
+            }
+            for column, statement in position_migrations.items():
+                if column not in existing_position_columns:
                     connection.execute(statement)
             connection.execute(
                 """
