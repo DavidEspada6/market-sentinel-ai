@@ -15,7 +15,7 @@ releases make it a practical daily analysis tool while keeping paper trading as 
 | O8 | 2.8.2 | Complete | Adaptive predictions, directional watchlist zones and interactive chart inspection |
 | O9 | 2.9.3 | Complete | Leveraged simulation, per-product explanations and horizon-aware recalculation |
 | O10 | 2.10.2 | Complete | Continuous prediction evaluation, accuracy analytics, session-aware scheduling, detailed simulation history and automatic simulation exits |
-| O11 | 2.11.2 | Current | Short-horizon predictions, complete horizon analytics, cached live-news context, regime confidence filters, background refresh and resettable evaluation history |
+| O11 | 2.11.3 | Current | Short-horizon predictions, complete horizon analytics, cached live-news context, regime confidence filters, resilient background refresh and resettable evaluation history |
 | O12 | 3.0.0 | Optional | Broker integration only after explicit approval and a separate security review |
 
 ## What "operational" means

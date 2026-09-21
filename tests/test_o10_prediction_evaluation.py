@@ -10,6 +10,7 @@ from fastapi.testclient import TestClient
 
 from market_sentinel_ai.api import create_app
 from market_sentinel_ai.config import Settings
+from market_sentinel_ai.domain.instruments import custom_instrument
 from market_sentinel_ai.domain.market import Candle, Timeframe
 from market_sentinel_ai.domain.operations import PredictionEvaluation
 from market_sentinel_ai.domain.prediction import Direction
@@ -23,6 +24,11 @@ class EmptyProvider:
 
     def historical_candles(self, symbol, timeframe, start, end):
         return []
+
+
+class FailingProvider(EmptyProvider):
+    def historical_candles(self, symbol, timeframe, start, end):
+        raise OSError("network unavailable")
 
 
 def _evaluation(now: datetime) -> PredictionEvaluation:
@@ -182,6 +188,36 @@ class PredictionEvaluationTests(unittest.TestCase):
 
             self.assertEqual(result.generated, 0)
             self.assertEqual(repository.list_predictions(), [])
+
+    def test_monitor_uses_cached_candles_when_provider_is_temporarily_unavailable(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            database = Path(directory) / "market.sqlite3"
+            repository = SQLiteCandleRepository(database)
+            now = datetime.now(tz=UTC)
+            repository.upsert_many(
+                [
+                    Candle(
+                        symbol="AAPL",
+                        timeframe=Timeframe.FIVE_MINUTES,
+                        opened_at=now - timedelta(minutes=10 - index * 5),
+                        open=100.0 + index,
+                        high=100.5 + index,
+                        low=99.5 + index,
+                        close=100.2 + index,
+                        volume=100_000,
+                    )
+                    for index in range(3)
+                ]
+            )
+            repository.add_watchlist_item(custom_instrument("AAPL"))
+            settings = replace(Settings.from_env(), database_url=f"sqlite:///{database}")
+            service = MarketScanService(settings, repository=repository, provider=FailingProvider())
+
+            result = PredictionMonitor(service).run_once(now=now)
+
+            self.assertGreater(result.generated, 0)
+            self.assertTrue(any("using cached candles" in error for error in result.errors))
+            self.assertLess(result.finished_at - result.started_at, timedelta(seconds=10))
 
     def test_simulation_trade_keeps_cost_and_leverage_details(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

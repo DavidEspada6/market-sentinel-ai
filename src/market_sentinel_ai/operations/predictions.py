@@ -67,13 +67,22 @@ class PredictionMonitor:
                 if spec.lookback is not None:
                     grouped_specs[spec.timeframe].append(spec)
 
+            provider_available = True
             for instrument in instruments:
                 if not _market_session_open(instrument, started_at):
                     continue
                 market_context = self.service.market_context(instrument.symbol, started_at)
                 for timeframe, specs in grouped_specs.items():
                     try:
-                        candles = self._load_candles(instrument, timeframe, specs, started_at)
+                        candles, used_fallback = self._load_candles(
+                            instrument,
+                            timeframe,
+                            specs,
+                            started_at,
+                            refresh=provider_available,
+                            warnings=errors,
+                        )
+                        provider_available = provider_available and not used_fallback
                         if len(candles) < 2:
                             continue
                         resolved += self._resolve_pending(
@@ -142,26 +151,45 @@ class PredictionMonitor:
         timeframe: Timeframe,
         specs: list[ChartWindowSpec],
         end: datetime,
-    ) -> list[Candle]:
+        *,
+        refresh: bool = True,
+        warnings: list[str] | None = None,
+    ) -> tuple[list[Candle], bool]:
         lookback = _monitor_lookback(timeframe, specs)
         start = end - lookback
-        fetched = sorted(
-            [
-                candle
-                for candle in self.service.provider.historical_candles(
-                    instrument.market_symbol,
-                    timeframe,
-                    start,
-                    end,
+        if not refresh:
+            return (
+                self.repository.list_candles(instrument.market_symbol, timeframe, start, end),
+                True,
+            )
+        try:
+            fetched = sorted(
+                [
+                    candle
+                    for candle in self.service.provider.historical_candles(
+                        instrument.market_symbol,
+                        timeframe,
+                        start,
+                        end,
+                    )
+                    if start <= candle.opened_at < end
+                ],
+                key=lambda candle: candle.opened_at,
+            )
+        except (MarketDataProviderError, OSError, ValueError, RuntimeError) as exc:
+            cached = self.repository.list_candles(instrument.market_symbol, timeframe, start, end)
+            if len(cached) < 2:
+                raise
+            if warnings is not None:
+                warnings.append(
+                    f"{instrument.symbol}/{timeframe.value}: provider unavailable; "
+                    f"using cached candles ({exc})"
                 )
-                if start <= candle.opened_at < end
-            ],
-            key=lambda candle: candle.opened_at,
-        )
+            return cached, True
         if fetched:
             self.repository.upsert_many(fetched)
-            return fetched
-        return self.repository.list_candles(instrument.market_symbol, timeframe, start, end)
+            return fetched, False
+        return self.repository.list_candles(instrument.market_symbol, timeframe, start, end), False
 
     def _generate_prediction(
         self,

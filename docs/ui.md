@@ -65,7 +65,8 @@ externamente tienen prioridad sobre `.env`.
   PnL y motivo de cierre. El monitor automático se ejecuta en segundo plano cada 60 segundos por
   defecto, aunque estés en otra pestaña, siempre que el servidor siga abierto, y
   evita duplicar una predicción para la misma vela; una predicción nueva aparece al llegar una vela
-  nueva del timeframe correspondiente.
+  nueva del timeframe correspondiente. Si el proveedor falla temporalmente, usa la última caché
+  disponible y lo indica como estado degradado.
 - Los sábados y domingos el monitor pausa acciones, ETFs, índices, divisas y materias primas;
   las criptomonedas continúan al estar disponibles 24/7. Las predicciones del viernes esperan a
   la primera vela real posterior para poder medirse correctamente.

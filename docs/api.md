@@ -23,6 +23,8 @@ The default binding is local-only. The service does not place real orders.
 - GET /api/v1/predictions/status returns the automatic monitor state, pending count and configured
   refresh interval. The web server starts this monitor in the background; the default interval is
   one minute through `MARKET_DATA_POLL_SECONDS=60`.
+  A failed provider request is bounded by `MARKET_DATA_HTTP_TIMEOUT_SECONDS=8`; the monitor then
+  uses cached candles for the rest of that cycle and retries the provider on the next cycle.
 - GET /api/v1/predictions lists saved predictions with optional symbol, timeframe, window, status
   and limit filters. Status is pending or resolved.
 - POST /api/v1/predictions/reset clears prediction evaluations and their aciertos/fallos without

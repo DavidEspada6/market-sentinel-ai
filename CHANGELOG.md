@@ -4,6 +4,17 @@ All notable changes to Market Sentinel AI will be documented in this file.
 
 The project follows semantic versioning once v1.0.0 is reached. Pre-1.0 releases map to the staged roadmap.
 
+## [2.11.3] - 2026-09-21
+
+### Fixed
+
+- Generate predictions from cached candles when a temporary provider/network failure prevents a
+  fresh download, so one unavailable timeframe no longer suppresses all of its horizons.
+- Base the `6h` and `12h` horizons on the widely available `5m` series when `15m` history is
+  incomplete, so short and intraday horizons are populated consistently across the watchlist.
+- Keep the provider failure visible as a degraded monitor warning instead of presenting cached data
+  as fresh market data.
+
 ## [2.11.2] - 2026-09-21
 
 ### Fixed

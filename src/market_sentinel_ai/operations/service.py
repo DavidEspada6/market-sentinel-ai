@@ -59,6 +59,7 @@ class MarketScanService:
         self.alert_channel = alert_channel or _build_alert_channel(settings)
         self._news_provider = _build_news_provider(settings, self.provider)
         self._news_cache: dict[str, tuple[datetime, dict[str, object]]] = {}
+        self._news_provider_unavailable_until: datetime | None = None
         self._adaptive_models: dict[
             tuple[str, str, int], tuple[tuple[int, str, float, int], AdaptiveDirectionalModel]
         ] = {}
@@ -194,6 +195,21 @@ class MarketScanService:
         cached = self._news_cache.get(normalized)
         if cached and (timestamp - cached[0]).total_seconds() < self.settings.news.poll_seconds:
             return dict(cached[1])
+        if (
+            self._news_provider_unavailable_until is not None
+            and timestamp < self._news_provider_unavailable_until
+        ):
+            context = {
+                "symbol": normalized,
+                "news": [],
+                "news_count": 0,
+                "sources": [],
+                "sentiment_score": 0.0,
+                "sentiment_label": "neutral",
+                "news_status": "unavailable: provider retry deferred",
+            }
+            self._news_cache[normalized] = (timestamp, context)
+            return dict(context)
         try:
             context = NewsContextBuilder(self._news_provider).for_symbol(
                 normalized,
@@ -201,6 +217,9 @@ class MarketScanService:
             )
             context["news_status"] = "live" if context["news_count"] else "empty"
         except Exception as exc:  # noqa: BLE001 - a feed outage must not stop market scoring
+            self._news_provider_unavailable_until = timestamp + timedelta(
+                seconds=max(1, self.settings.news.poll_seconds)
+            )
             context = {
                 "symbol": normalized,
                 "news": [],

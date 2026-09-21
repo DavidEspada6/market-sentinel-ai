@@ -31,7 +31,7 @@ class CliSmokeTests(unittest.TestCase):
 
         payload = json.loads(result.stdout)
         self.assertEqual(payload["current_release"], "O11")
-        self.assertEqual(payload["current_version"], "2.11.2")
+        self.assertEqual(payload["current_version"], "2.11.3")
 
     def test_security_check_command_passes(self) -> None:
         result = subprocess.run(

@@ -58,10 +58,10 @@ _WINDOW_SPECS: dict[ChartWindow, ChartWindowSpec] = {
         ChartWindow.TWO_HOURS, "2 horas", timedelta(hours=2), Timeframe.FIVE_MINUTES
     ),
     ChartWindow.SIX_HOURS: ChartWindowSpec(
-        ChartWindow.SIX_HOURS, "6 horas", timedelta(hours=6), Timeframe.FIFTEEN_MINUTES
+        ChartWindow.SIX_HOURS, "6 horas", timedelta(hours=6), Timeframe.FIVE_MINUTES
     ),
     ChartWindow.TWELVE_HOURS: ChartWindowSpec(
-        ChartWindow.TWELVE_HOURS, "12 horas", timedelta(hours=12), Timeframe.FIFTEEN_MINUTES
+        ChartWindow.TWELVE_HOURS, "12 horas", timedelta(hours=12), Timeframe.FIVE_MINUTES
     ),
     ChartWindow.ONE_DAY: ChartWindowSpec(
         ChartWindow.ONE_DAY, "1 día", timedelta(days=1), Timeframe.ONE_HOUR
