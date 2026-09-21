@@ -23,6 +23,8 @@ The default binding is local-only. The service does not place real orders.
 - GET /api/v1/predictions/status returns the automatic monitor state and pending count.
 - GET /api/v1/predictions lists saved predictions with optional symbol, timeframe, window, status
   and limit filters. Status is pending or resolved.
+- POST /api/v1/predictions/reset clears prediction evaluations and their aciertos/fallos without
+  deleting market candles or simulation trades.
 - GET /api/v1/prediction-analytics returns overall, per-horizon and per-symbol counts, accuracy,
   average expected/actual returns and recent records with the same filters.
 - GET /api/v1/instruments searches the curated instrument universe with optional \`q\`,
@@ -33,10 +35,10 @@ The default binding is local-only. The service does not place real orders.
 - DELETE /api/v1/watchlist/{symbol} disables a watchlist entry.
 - GET /api/v1/market/{symbol}?window=1d returns historical candles, signal context, risk levels
   and a quantitative explanation of the directional drivers and entry/target/stop levels, plus
-  an approximate ATR/momentum future envelope. The response includes `data_as_of` and, when a
+  an approximate ATR/momentum future envelope and cached headline context/sentiment. The response includes `data_as_of` and, when a
   short window is outside market hours, `data_notice` explaining that the latest completed
-  provider session was used for the recalculation. Supported windows are `1m`, `5m`, `30m`, `1h`,
-  `6h`, `12h`, `1d`, `1w`, `1mo`, `3mo`, `6mo`, `1y`, `3y` and `total`.
+  provider session was used for the recalculation. Supported windows are `1m`, `5m`, `10m`, `30m`,
+  `1h`, `2h`, `6h`, `12h`, `1d`, `1w`, `1mo`, `3mo`, `6mo`, `1y`, `3y` and `total`.
 - POST /api/v1/watchlist/scan scans every enabled watchlist instrument once and persists the
   scheduler run and resulting signals.
 - GET /api/v1/astra-usage lists today's request, cache, token and estimated-cost counters.

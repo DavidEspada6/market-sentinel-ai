@@ -14,19 +14,20 @@ releases make it a practical daily analysis tool while keeping paper trading as 
 | O7 | 2.7.4 | Complete | Complete UI control center for scanning, paper metrics and diagnostics |
 | O8 | 2.8.2 | Complete | Adaptive predictions, directional watchlist zones and interactive chart inspection |
 | O9 | 2.9.3 | Complete | Leveraged simulation, per-product explanations and horizon-aware recalculation |
-| O10 | 2.10.2 | Current | Continuous prediction evaluation, accuracy analytics, session-aware scheduling, detailed simulation history and automatic simulation exits |
-| O11 | 3.0.0 | Optional | Broker integration only after explicit approval and a separate security review |
+| O10 | 2.10.2 | Complete | Continuous prediction evaluation, accuracy analytics, session-aware scheduling, detailed simulation history and automatic simulation exits |
+| O11 | 2.11.0 | Current | Short-horizon predictions, cached live-news context, regime confidence filters and resettable evaluation history |
+| O12 | 3.0.0 | Optional | Broker integration only after explicit approval and a separate security review |
 
 ## What "operational" means
 
-At O10 the app continuously scans configured instruments, persists every decision and horizon
+At O11 the app continuously scans configured instruments, persists every decision and horizon
 prediction, resolves predictions against later provider prices, exposes accuracy analytics, retrains
 a local supervised directional model when enough provider history exists, exposes its out-of-sample
 metrics, alerts on new actionable changes, shows paper performance and risk metrics, and exposes
 scanning, diagnostics, paper history, context usage and a mark-to-market leveraged simulator directly
 in the visual workspace. It still does not submit real orders.
 
-O11 is not required for a useful operational application. It is deliberately separate because
+O12 is not required for a useful operational application. It is deliberately separate because
 real execution adds authentication, broker-specific behavior, reconciliation, order state,
 manual approval and incident-response requirements that should not be mixed into the analysis
 track.

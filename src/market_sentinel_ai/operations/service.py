@@ -9,13 +9,20 @@ from uuid import uuid4
 from market_sentinel_ai.adapters.market_data import build_market_data_provider
 from market_sentinel_ai.alerts import DryRunAlertChannel, JsonlAlertChannel, WebhookAlertChannel
 from market_sentinel_ai.config import Settings
+from market_sentinel_ai.context import (
+    GoogleNewsRssProvider,
+    NewsContextBuilder,
+    RssNewsProvider,
+    StaticNewsProvider,
+)
 from market_sentinel_ai.domain.market import Candle, Timeframe
 from market_sentinel_ai.domain.operations import AlertRecord, SignalRecord
-from market_sentinel_ai.domain.prediction import Prediction
+from market_sentinel_ai.domain.prediction import Direction, Prediction
 from market_sentinel_ai.features import OHLCVFeatureEngine
 from market_sentinel_ai.ingestion import MarketDataIngestionService
 from market_sentinel_ai.models import AdaptiveDirectionalModel, MomentumBaselineModel
 from market_sentinel_ai.ports.features import FeatureRow
+from market_sentinel_ai.regime import VolatilityRegimeDetector
 from market_sentinel_ai.signals import SignalEngine, build_trade_plan
 from market_sentinel_ai.storage import SQLiteCandleRepository, sqlite_path_from_url
 
@@ -50,6 +57,8 @@ class MarketScanService:
         )
         self.provider = provider or build_market_data_provider(settings.market_data)
         self.alert_channel = alert_channel or _build_alert_channel(settings)
+        self._news_provider = _build_news_provider(settings, self.provider)
+        self._news_cache: dict[str, tuple[datetime, dict[str, object]]] = {}
         self._adaptive_models: dict[
             tuple[str, str, int], tuple[tuple[int, str, float, int], AdaptiveDirectionalModel]
         ] = {}
@@ -75,7 +84,12 @@ class MarketScanService:
             + self.settings.risk.default_slippage_bps * 2
             + self.settings.risk.default_spread_bps
         )
-        prediction, features = self.predict_market(candles, timeframe, round_trip_cost_bps)
+        prediction, features = self.predict_market(
+            candles,
+            timeframe,
+            round_trip_cost_bps,
+            market_context=self.market_context(symbol),
+        )
         signal = SignalEngine(
             min_probability=0.55,
             min_expected_return_bps=round_trip_cost_bps,
@@ -112,6 +126,7 @@ class MarketScanService:
         timeframe: Timeframe,
         round_trip_cost_bps: float,
         horizon_minutes: int | None = None,
+        market_context: dict[str, object] | None = None,
     ) -> tuple[Prediction, list[FeatureRow]]:
         """Return the adaptive prediction, falling back transparently when untrainable."""
         if not candles:
@@ -168,8 +183,35 @@ class MarketScanService:
             model = None
 
         if model is not None:
-            return model.predict(features), features
-        return MomentumBaselineModel(horizon_minutes=requested_horizon).predict(features), features
+            prediction = model.predict(features)
+        else:
+            prediction = MomentumBaselineModel(horizon_minutes=requested_horizon).predict(features)
+        return _apply_market_context(prediction, features, market_context), features
+
+    def market_context(self, symbol: str, now: datetime | None = None) -> dict[str, object]:
+        normalized = symbol.strip().upper()
+        timestamp = now or datetime.now(tz=UTC)
+        cached = self._news_cache.get(normalized)
+        if cached and (timestamp - cached[0]).total_seconds() < self.settings.news.poll_seconds:
+            return dict(cached[1])
+        try:
+            context = NewsContextBuilder(self._news_provider).for_symbol(
+                normalized,
+                self.settings.news.max_items,
+            )
+            context["news_status"] = "live" if context["news_count"] else "empty"
+        except Exception as exc:  # noqa: BLE001 - a feed outage must not stop market scoring
+            context = {
+                "symbol": normalized,
+                "news": [],
+                "news_count": 0,
+                "sources": [],
+                "sentiment_score": 0.0,
+                "sentiment_label": "neutral",
+                "news_status": f"unavailable: {exc}",
+            }
+        self._news_cache[normalized] = (timestamp, context)
+        return dict(context)
 
     def model_status(self) -> list[dict[str, str | float | int | bool]]:
         return [dict(self._model_status[key]) for key in sorted(self._model_status)]
@@ -237,6 +279,82 @@ def _build_alert_channel(settings: Settings) -> object:
     if settings.alerts.webhook_url:
         return WebhookAlertChannel(settings.alerts.webhook_url)
     return JsonlAlertChannel("logs/alerts.jsonl")
+
+
+def _build_news_provider(settings: Settings, market_provider: object) -> object:
+    market_provider_name = str(getattr(market_provider, "provider_name", "")).lower()
+    if market_provider_name == "demo" or market_provider_name.startswith("test"):
+        return StaticNewsProvider()
+    provider = settings.news.provider.strip().lower()
+    if provider in {"", "none", "disabled"}:
+        return StaticNewsProvider()
+    if provider in {"google", "google_rss"}:
+        return GoogleNewsRssProvider()
+    if provider == "rss" and settings.news.feed_urls:
+        return RssNewsProvider(settings.news.feed_urls)
+    return StaticNewsProvider()
+
+
+def _apply_market_context(
+    prediction: Prediction,
+    features: Sequence[FeatureRow],
+    context: dict[str, object] | None,
+) -> Prediction:
+    """Gate model confidence with independent trend, volatility and headline context."""
+    latest = features[-1]
+    values = latest.values
+    regime = VolatilityRegimeDetector().detect(list(features)).value
+    trend_score = _clamp(
+        (
+            float(values.get("ema_cross_bps", 0.0))
+            + float(values.get("rolling_return_mean_bps", 0.0))
+        )
+        / 10.0,
+        -1.0,
+        1.0,
+    )
+    news_score = _clamp(float((context or {}).get("sentiment_score", 0.0)), -1.0, 1.0)
+    adjustment = 0.0
+    direction = prediction.direction
+    if direction is not Direction.NO_TRADE:
+        direction_sign = 1.0 if direction is Direction.LONG else -1.0
+        trend_alignment = direction_sign * trend_score
+        news_alignment = direction_sign * news_score
+        if trend_alignment >= 0.35:
+            adjustment += 0.03
+        elif trend_alignment <= -0.35:
+            adjustment -= 0.06
+        if news_alignment >= 0.2:
+            adjustment += 0.04
+        elif news_alignment <= -0.2:
+            adjustment -= 0.08
+        if regime == "HIGH_VOLATILITY":
+            adjustment -= 0.05
+        probability = _clamp(prediction.probability + adjustment, 0.0, 0.99)
+        if probability < 0.55:
+            direction = Direction.NO_TRADE
+    else:
+        probability = prediction.probability
+
+    metadata = {
+        **prediction.metadata,
+        "market_regime": regime,
+        "trend_score": round(trend_score, 3),
+        "news_score": news_score,
+        "news_count": int((context or {}).get("news_count", 0)),
+        "news_status": str((context or {}).get("news_status", "not_requested")),
+        "context_adjustment": round(adjustment, 3),
+    }
+    return replace(
+        prediction,
+        direction=direction,
+        probability=probability,
+        metadata=metadata,
+    )
+
+
+def _clamp(value: float, lower: float, upper: float) -> float:
+    return max(lower, min(upper, value))
 
 
 def _timeframe_minutes(timeframe: Timeframe) -> int:

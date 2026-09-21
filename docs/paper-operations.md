@@ -37,3 +37,7 @@ equity and exposes an approximate liquidation price for each position. If a refr
 reaches that threshold, the simulator closes the position automatically as a simulated liquidation.
 Resetting the account clears its simulation history and requires all positions to be closed first.
 It never submits broker orders and always reports `real_orders_enabled=false`.
+
+The **Análisis de predicciones** page includes a reset action for starting a clean measurement
+period after a model release. It removes only prediction evaluations; simulation operations and
+market history remain intact.

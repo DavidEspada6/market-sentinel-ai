@@ -5,6 +5,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
+from urllib.parse import urlencode
 
 from market_sentinel_ai.adapters.market_data.http import HttpTransport, download
 
@@ -59,17 +60,45 @@ class RssNewsProvider:
         )
 
 
+class GoogleNewsRssProvider:
+    """Credential-free live headline adapter, replaceable through the context port."""
+
+    def __init__(
+        self,
+        *,
+        base_url: str = "https://news.google.com/rss/search",
+        transport: HttpTransport = download,
+    ) -> None:
+        self.base_url = base_url.rstrip("/")
+        self.transport = transport
+
+    def latest_for_symbol(self, symbol: str, limit: int = 5) -> tuple[NewsItem, ...]:
+        if limit <= 0:
+            raise ValueError("limit must be positive")
+        query = f'"{symbol.upper()}" stock OR shares OR market'
+        params = {"q": query, "hl": "en-US", "gl": "US", "ceid": "US:en"}
+        url = f"{self.base_url}?{urlencode(params)}"
+        items = _parse_feed(self.transport(url), "google-news")
+        unique = {item.url or item.title: item for item in items}
+        return tuple(
+            sorted(unique.values(), key=lambda item: item.published_at, reverse=True)[:limit]
+        )
+
+
 class NewsContextBuilder:
     def __init__(self, provider: object) -> None:
         self.provider = provider
 
     def for_symbol(self, symbol: str, limit: int = 5) -> dict[str, object]:
         items = self.provider.latest_for_symbol(symbol, limit)
+        sentiment_score = _sentiment_score(items)
         return {
             "symbol": symbol.upper(),
             "news": [item.to_dict() for item in items],
             "news_count": len(items),
             "sources": [f"news:{item.source}" for item in items],
+            "sentiment_score": sentiment_score,
+            "sentiment_label": _sentiment_label(sentiment_score),
         }
 
 
@@ -115,6 +144,36 @@ def _parse_feed(payload: bytes, source: str) -> list[NewsItem]:
             )
         )
     return items
+
+
+_POSITIVE_TERMS = {
+    "beat", "beats", "bullish", "buy", "growth", "improves", "profit", "profits",
+    "record", "raise", "raises", "rebound", "rises", "soars", "strong", "upgrade",
+}
+_NEGATIVE_TERMS = {
+    "bearish", "cuts", "decline", "downgrade", "fraud", "falls", "loss", "losses",
+    "miss", "misses", "probe", "recall", "recession", "slump", "warning", "weak",
+}
+
+
+def _sentiment_score(items: Sequence[NewsItem]) -> float:
+    if not items:
+        return 0.0
+    scores: list[float] = []
+    for item in items:
+        words = set((item.title + " " + (item.summary or "")).lower().split())
+        positive = len(words & _POSITIVE_TERMS)
+        negative = len(words & _NEGATIVE_TERMS)
+        scores.append(max(-1.0, min(1.0, (positive - negative) / 2)))
+    return round(sum(scores) / len(scores), 3)
+
+
+def _sentiment_label(score: float) -> str:
+    if score >= 0.2:
+        return "positive"
+    if score <= -0.2:
+        return "negative"
+    return "neutral"
 
 
 def _local_name(tag: str) -> str:

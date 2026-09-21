@@ -14,8 +14,10 @@ from market_sentinel_ai.signals.trade_plan import TradePlan
 class ChartWindow(StrEnum):
     ONE_MINUTE = "1m"
     FIVE_MINUTES = "5m"
+    TEN_MINUTES = "10m"
     THIRTY_MINUTES = "30m"
     ONE_HOUR = "1h"
+    TWO_HOURS = "2h"
     SIX_HOURS = "6h"
     TWELVE_HOURS = "12h"
     ONE_DAY = "1d"
@@ -43,11 +45,17 @@ _WINDOW_SPECS: dict[ChartWindow, ChartWindowSpec] = {
     ChartWindow.FIVE_MINUTES: ChartWindowSpec(
         ChartWindow.FIVE_MINUTES, "5 minutos", timedelta(minutes=5), Timeframe.FIVE_MINUTES
     ),
+    ChartWindow.TEN_MINUTES: ChartWindowSpec(
+        ChartWindow.TEN_MINUTES, "10 minutos", timedelta(minutes=10), Timeframe.FIVE_MINUTES
+    ),
     ChartWindow.THIRTY_MINUTES: ChartWindowSpec(
         ChartWindow.THIRTY_MINUTES, "30 minutos", timedelta(minutes=30), Timeframe.FIVE_MINUTES
     ),
     ChartWindow.ONE_HOUR: ChartWindowSpec(
         ChartWindow.ONE_HOUR, "1 hora", timedelta(hours=1), Timeframe.FIVE_MINUTES
+    ),
+    ChartWindow.TWO_HOURS: ChartWindowSpec(
+        ChartWindow.TWO_HOURS, "2 horas", timedelta(hours=2), Timeframe.FIVE_MINUTES
     ),
     ChartWindow.SIX_HOURS: ChartWindowSpec(
         ChartWindow.SIX_HOURS, "6 horas", timedelta(hours=6), Timeframe.FIFTEEN_MINUTES
@@ -117,12 +125,13 @@ def build_market_chart_payload(
     provider: str,
     source: str,
     data_notice: str | None = None,
+    market_context: dict[str, object] | None = None,
 ) -> dict[str, object]:
     latest = candles[-1]
     first_close = candles[0].close
     change_pct = ((latest.close - first_close) / first_close) * 100 if first_close else 0.0
     forecast = _build_forecast(candles, signal, plan, feature)
-    explanation = _build_explanation(latest, signal, plan, feature)
+    explanation = _build_explanation(latest, signal, plan, feature, market_context)
     return {
         "symbol": instrument["symbol"],
         "market_symbol": latest.symbol,
@@ -136,6 +145,7 @@ def build_market_chart_payload(
         "source": source,
         "data_as_of": latest.opened_at.isoformat(),
         "data_notice": data_notice,
+        "market_context": market_context or {},
         "candle_count": len(candles),
         "change_pct": change_pct,
         "candles": [_candle_to_dict(candle) for candle in candles],
@@ -188,6 +198,7 @@ def _build_explanation(
     signal: Signal,
     plan: TradePlan,
     feature: FeatureRow,
+    market_context: dict[str, object] | None = None,
 ) -> dict[str, object]:
     values = feature.values
     direction = signal.prediction.direction
@@ -302,6 +313,19 @@ def _build_explanation(
         )
     if abs(ema_slope) >= 0.5:
         drivers.append(f"La pendiente reciente del cruce de medias es {ema_slope:+.1f} bps.")
+    context = market_context or {}
+    news_count = int(context.get("news_count", 0))
+    news_score = float(context.get("sentiment_score", 0.0))
+    news_label = str(context.get("sentiment_label", "neutral"))
+    if news_count:
+        drivers.append(
+            f"El contexto de {news_count} titulares recientes es {news_label} "
+            f"(score {news_score:+.2f}); solo ajusta la confianza, no sustituye al precio."
+        )
+    elif str(context.get("news_status", "")).startswith("unavailable"):
+        warnings.append(
+            "No se pudo consultar el contexto de noticias; la lectura usa solo mercado."
+        )
     if not drivers:
         drivers.append(
             "No hay indicadores suficientes para explicar una ventaja direccional clara."

@@ -347,6 +347,11 @@ def create_app(
             )
         ]
 
+    @app.post("/api/v1/predictions/reset")
+    def reset_prediction_history() -> dict[str, object]:
+        deleted = repository.reset_prediction_history()
+        return {"deleted": deleted, "simulation_history_preserved": True}
+
     @app.get("/api/v1/prediction-analytics")
     def prediction_analytics(
         symbol: str | None = None,
@@ -593,10 +598,12 @@ def create_app(
             + active_settings.risk.default_slippage_bps * 2
             + active_settings.risk.default_spread_bps
         )
+        market_context = active_service.market_context(normalized)
         prediction, features = active_service.predict_market(
             analysis_candles,
             spec.timeframe,
             round_trip_cost_bps,
+            market_context=market_context,
         )
         signal = SignalEngine(
             min_probability=0.55,
@@ -619,6 +626,7 @@ def create_app(
             provider=getattr(active_service.provider, "provider_name", "unknown"),
             source=source,
             data_notice=data_notice,
+            market_context=market_context,
         )
 
     @app.post("/api/v1/watchlist")

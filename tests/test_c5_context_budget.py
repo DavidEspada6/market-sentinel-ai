@@ -7,7 +7,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from market_sentinel_ai.config import Settings
-from market_sentinel_ai.context import NewsContextBuilder, RssNewsProvider
+from market_sentinel_ai.context import GoogleNewsRssProvider, NewsContextBuilder, RssNewsProvider
 from market_sentinel_ai.domain.prediction import Direction, Prediction, Signal
 from market_sentinel_ai.reasoning import (
     AstraCostPolicy,
@@ -52,6 +52,24 @@ class C5ContextBudgetTests(unittest.TestCase):
         self.assertEqual(context["news_count"], 1)
         self.assertEqual(context["news"][0]["title"], "SPY earnings context")
         self.assertEqual(context["sources"], ["news:https://feed.example/rss"])
+
+    def test_google_rss_provider_scores_live_headline_context(self) -> None:
+        payload = b"""
+        <rss><channel>
+          <item>
+            <title>AAPL beats estimates with strong growth</title>
+            <link>https://news.example/aapl</link>
+            <pubDate>Sat, 19 Sep 2026 08:00:00 GMT</pubDate>
+          </item>
+        </channel></rss>
+        """
+        provider = GoogleNewsRssProvider(transport=lambda _: payload)
+
+        context = NewsContextBuilder(provider).for_symbol("AAPL")
+
+        self.assertEqual(context["news_count"], 1)
+        self.assertEqual(context["sentiment_label"], "positive")
+        self.assertGreater(context["sentiment_score"], 0)
 
     def test_gateway_persists_request_budget_and_cache_hits(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

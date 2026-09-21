@@ -4,6 +4,17 @@ All notable changes to Market Sentinel AI will be documented in this file.
 
 The project follows semantic versioning once v1.0.0 is reached. Pre-1.0 releases map to the staged roadmap.
 
+## [2.11.0] - 2026-09-21
+
+### Added
+
+- Added 10-minute and 2-hour short-horizon prediction windows, using supported 5-minute market
+  candles as the base without fabricating provider intervals.
+- Added cached live headline context through Google News RSS by default, configurable RSS feeds,
+  transparent sentiment scoring and a market/regime confidence filter.
+- Added a prediction-history reset action that clears only prediction evaluations while preserving
+  market candles and simulation operations.
+
 ## [2.10.2] - 2026-09-20
 
 ### Added

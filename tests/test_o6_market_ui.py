@@ -85,8 +85,10 @@ class O6MarketUITests(unittest.TestCase):
             [
                 "1m",
                 "5m",
+                "10m",
                 "30m",
                 "1h",
+                "2h",
                 "6h",
                 "12h",
                 "1d",
@@ -100,6 +102,8 @@ class O6MarketUITests(unittest.TestCase):
             ],
         )
         self.assertEqual(chart_window_spec("1mo").timeframe, Timeframe.ONE_DAY)
+        self.assertEqual(chart_window_spec("10m").timeframe, Timeframe.FIVE_MINUTES)
+        self.assertEqual(chart_window_spec("2h").timeframe, Timeframe.FIVE_MINUTES)
         self.assertIsNone(chart_window_spec("total").lookback)
 
     def test_market_endpoint_returns_chart_levels_and_forecast(self) -> None:
@@ -151,6 +155,8 @@ class O6MarketUITests(unittest.TestCase):
             self.assertIn('class="watchlist-row"', html)
             self.assertIn('data-watchlist-direction=', html)
             self.assertIn('data-window="1mo"', html)
+            self.assertIn('data-window="10m"', html)
+            self.assertIn('data-window="2h"', html)
             self.assertIn("/api/v1/market/", html)
             self.assertIn('id="scan-periodic"', html)
             self.assertIn('id="paper-metrics"', html)

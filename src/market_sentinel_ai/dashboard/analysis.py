@@ -68,10 +68,11 @@ def render_prediction_analytics() -> str:
     <form class="filters" id="filters">
       <label>Producto o acción<input id="symbol" placeholder="Todos" maxlength="24"></label>
       <label>Timeframe interno<select id="timeframe"><option value="">Todos</option><option value="1m">1m</option><option value="5m">5m</option><option value="15m">15m</option><option value="1h">1h</option><option value="1d">1d</option></select></label>
-      <label>Horizonte<select id="window"><option value="">Todos</option><option value="1m">1 minuto</option><option value="5m">5 minutos</option><option value="30m">30 minutos</option><option value="1h">1 hora</option><option value="6h">6 horas</option><option value="12h">12 horas</option><option value="1d">1 día</option><option value="1w">1 semana</option><option value="1mo">1 mes</option><option value="3mo">3 meses</option><option value="6mo">6 meses</option><option value="1y">1 año</option><option value="3y">3 años</option></select></label>
+      <label>Horizonte<select id="window"><option value="">Todos</option><option value="1m">1 minuto</option><option value="5m">5 minutos</option><option value="10m">10 minutos</option><option value="30m">30 minutos</option><option value="1h">1 hora</option><option value="2h">2 horas</option><option value="6h">6 horas</option><option value="12h">12 horas</option><option value="1d">1 día</option><option value="1w">1 semana</option><option value="1mo">1 mes</option><option value="3mo">3 meses</option><option value="6mo">6 meses</option><option value="1y">1 año</option><option value="3y">3 años</option></select></label>
       <label>Estado<select id="status"><option value="">Todos</option><option value="resolved">Resueltas</option><option value="pending">Pendientes</option></select></label>
       <label>Muestras máximas<select id="limit"><option value="500">500</option><option value="2000">2.000</option><option value="5000" selected>5.000</option><option value="20000">20.000</option></select></label>
       <button type="submit">Actualizar análisis</button>
+      <button type="button" class="secondary" id="reset-history">Poner aciertos a cero</button>
     </form>
     <p class="status" id="status-message" aria-live="polite">Cargando análisis...</p>
     <section class="metrics" id="metrics"></section>
@@ -116,6 +117,15 @@ def render_prediction_analytics() -> str:
       $('status-message').textContent = `Actualizado ${new Date().toLocaleString()}. Las pendientes se resolverán automáticamente al vencer su horizonte.`;
     }
     $('filters').addEventListener('submit', (event) => { event.preventDefault(); load().catch(() => { $('status-message').textContent = 'No se pudo cargar el análisis.'; }); });
+    $('reset-history').addEventListener('click', async () => {
+      if (!window.confirm('Se borrará el historial de predicciones y sus aciertos/fallos. Las operaciones simuladas no se borrarán. ¿Continuar?')) return;
+      $('status-message').textContent = 'Reiniciando historial...';
+      const response = await fetch('/api/v1/predictions/reset', {method: 'POST'});
+      if (!response.ok) { $('status-message').textContent = 'No se pudo reiniciar el historial.'; return; }
+      const payload = await response.json();
+      $('status-message').textContent = `Historial reiniciado: ${payload.deleted} predicciones eliminadas.`;
+      await load();
+    });
     load().catch(() => { $('status-message').textContent = 'No se pudo cargar el análisis.'; });
     window.setInterval(() => load().catch(() => {}), 30000);
   </script>

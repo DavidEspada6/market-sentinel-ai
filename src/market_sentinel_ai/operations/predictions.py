@@ -66,6 +66,7 @@ class PredictionMonitor:
             for instrument in instruments:
                 if not _market_session_open(instrument, started_at):
                     continue
+                market_context = self.service.market_context(instrument.symbol, started_at)
                 for timeframe, specs in grouped_specs.items():
                     try:
                         candles = self._load_candles(instrument, timeframe, specs, started_at)
@@ -83,6 +84,7 @@ class PredictionMonitor:
                                 spec,
                                 candles,
                                 started_at,
+                                market_context,
                             )
                         # A short history in a provider can contain enough future bars
                         # to resolve an old pending record immediately after ingestion.
@@ -162,6 +164,7 @@ class PredictionMonitor:
         spec: ChartWindowSpec,
         candles: list[Candle],
         now: datetime,
+        market_context: dict[str, object],
     ) -> int:
         assert spec.lookback is not None
         horizon_minutes = max(1, int(spec.lookback.total_seconds() // 60))
@@ -175,6 +178,7 @@ class PredictionMonitor:
             spec.timeframe,
             cost_bps,
             horizon_minutes=horizon_minutes,
+            market_context=market_context,
         )
         signal = SignalEngine(
             min_probability=0.55,
@@ -210,7 +214,10 @@ class PredictionMonitor:
             metadata={
                 "provider": str(getattr(self.service.provider, "provider_name", "unknown")),
                 "action": plan.action,
+                "news_count": int(market_context.get("news_count", 0)),
+                "news_score": float(market_context.get("sentiment_score", 0.0)),
                 **plan.to_metadata(),
+                **prediction.metadata,
             },
         )
         return int(self.repository.record_prediction(record))

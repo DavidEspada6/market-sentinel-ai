@@ -575,6 +575,12 @@ class SQLiteCandleRepository:
             )
         return cursor.rowcount == 1
 
+    def reset_prediction_history(self) -> int:
+        """Delete prediction evaluations without touching candles or paper trades."""
+        with closing(self._connect()) as connection, connection:
+            cursor = connection.execute("DELETE FROM prediction_evaluations")
+        return cursor.rowcount
+
     def record_alert(self, alert: AlertRecord) -> None:
         with closing(self._connect()) as connection, connection:
             connection.execute(

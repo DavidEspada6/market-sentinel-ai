@@ -111,9 +111,17 @@ class PredictionEvaluationTests(unittest.TestCase):
             self.assertEqual(page.status_code, 200)
             self.assertIn("Resultado por horizonte", page.text)
             self.assertIn("/api/v1/prediction-analytics", page.text)
+            self.assertIn('value="10m"', page.text)
+            self.assertIn('value="2h"', page.text)
+            self.assertIn('id="reset-history"', page.text)
             self.assertEqual(response.status_code, 200)
             self.assertEqual(response.json()["accuracy_pct"], 100.0)
             self.assertEqual(response.json()["best_window"], "1m")
+
+            reset = client.post("/api/v1/predictions/reset")
+            self.assertEqual(reset.status_code, 200)
+            self.assertEqual(reset.json()["deleted"], 1)
+            self.assertEqual(client.get("/api/v1/predictions").json(), [])
 
     def test_monitor_skips_exchange_assets_on_weekends(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

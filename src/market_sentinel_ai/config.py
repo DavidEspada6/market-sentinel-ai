@@ -23,6 +23,11 @@ def _env_int(name: str, default: int) -> int:
     return int(value)
 
 
+def _env_csv(name: str) -> tuple[str, ...]:
+    value = os.getenv(name, "")
+    return tuple(item.strip() for item in value.split(",") if item.strip())
+
+
 def _env_bool(name: str, default: bool) -> bool:
     value = os.getenv(name)
     if value is None or value == "":
@@ -76,6 +81,14 @@ class OrderBookSettings:
 
 
 @dataclass(frozen=True)
+class NewsSettings:
+    provider: str
+    feed_urls: tuple[str, ...]
+    poll_seconds: int
+    max_items: int
+
+
+@dataclass(frozen=True)
 class AlertSettings:
     dry_run: bool
     dedupe_minutes: int
@@ -101,6 +114,7 @@ class Settings:
     market_data: MarketDataSettings
     instrument_search: InstrumentSearchSettings
     order_book: OrderBookSettings
+    news: NewsSettings
     alerts: AlertSettings
     risk: RiskSettings
 
@@ -145,6 +159,12 @@ class Settings:
                 base_url=_env_str("MARKET_ORDER_BOOK_BASE_URL", ""),
                 depth=_env_int("MARKET_ORDER_BOOK_DEPTH", 20),
                 poll_seconds=_env_int("MARKET_ORDER_BOOK_POLL_SECONDS", 10),
+            ),
+            news=NewsSettings(
+                provider=_env_str("MARKET_NEWS_PROVIDER", "google_rss"),
+                feed_urls=_env_csv("MARKET_NEWS_FEED_URLS"),
+                poll_seconds=_env_int("MARKET_NEWS_POLL_SECONDS", 300),
+                max_items=_env_int("MARKET_NEWS_MAX_ITEMS", 5),
             ),
             alerts=AlertSettings(
                 dry_run=_env_bool("ALERTS_DRY_RUN", True),

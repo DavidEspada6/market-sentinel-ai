@@ -215,6 +215,15 @@ FOLLOW_ON_PLAN: tuple[Release, ...] = (
     ),
     Release(
         code="O11",
+        version="2.11.0",
+        title="Short-Horizon Context And Evaluation Reset",
+        objective=(
+            "Add 10-minute and 2-hour horizons, cached live-news context, regime-aware confidence "
+            "filters and a resettable prediction evaluation history."
+        ),
+    ),
+    Release(
+        code="O12",
         version="3.0.0",
         title="Optional Broker Integration Review",
         objective=(
@@ -224,4 +233,4 @@ FOLLOW_ON_PLAN: tuple[Release, ...] = (
     ),
 )
 
-CURRENT_RELEASE = FOLLOW_ON_PLAN[9]
+CURRENT_RELEASE = FOLLOW_ON_PLAN[10]
