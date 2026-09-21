@@ -117,6 +117,13 @@ class PredictionEvaluationTests(unittest.TestCase):
             self.assertEqual(response.status_code, 200)
             self.assertEqual(response.json()["accuracy_pct"], 100.0)
             self.assertEqual(response.json()["best_window"], "1m")
+            self.assertEqual(response.json()["by_symbol"][0]["key"], "AAPL")
+            self.assertEqual(len(response.json()["recent"]), 1)
+            self.assertIn("overallAccuracyClass", page.text)
+            self.assertEqual(
+                PredictionMonitor(service).status()["interval_seconds"],
+                settings.market_data.poll_seconds,
+            )
 
             all_results = client.get("/api/v1/prediction-analytics").json()
             self.assertEqual(

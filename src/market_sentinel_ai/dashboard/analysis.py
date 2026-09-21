@@ -97,11 +97,11 @@ def render_prediction_analytics() -> str:
       return `<tr><td>${includeProduct ? safe(item.key) : safe(item.key)}</td><td>${item.total}</td><td>${item.resolved}</td><td>${item.correct}</td><td>${item.incorrect ?? '-'}</td><td class="${cls}">${pct(accuracy)}</td><td>${bps(item.avg_actual_return_bps)}</td></tr>`;
     }
     function render(payload) {
-      const accuracyClass = payload.accuracy_pct !== null && payload.accuracy_pct >= 50 ? 'good' : 'bad';
+      const overallAccuracyClass = payload.accuracy_pct !== null && payload.accuracy_pct >= 50 ? 'good' : 'bad';
       $('metrics').innerHTML = [
         metric('Predicciones', payload.total), metric('Pendientes', payload.pending, 'pending'),
         metric('Resueltas', payload.resolved), metric('Aciertos', payload.correct, 'good'),
-        metric('Fallos', payload.incorrect, 'bad'), metric('Acierto general', pct(payload.accuracy_pct), accuracyClass),
+        metric('Fallos', payload.incorrect, 'bad'), metric('Acierto general', pct(payload.accuracy_pct), overallAccuracyClass),
         metric('Mejor horizonte', safe(payload.best_window), 'good'), metric('Retorno real medio', bps(payload.avg_actual_return_bps))
       ].join('');
       $('window-rows').innerHTML = payload.by_window.length ? payload.by_window.map((item) => aggregateRow(item, false)).join('') : '<tr><td colspan="7" class="muted">Sin resultados para estos filtros.</td></tr>';

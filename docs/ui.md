@@ -62,7 +62,8 @@ externamente tienen prioridad sobre `.env`.
   configurados, aunque todavía tengan cero muestras. Puedes filtrar por símbolo, timeframe,
   horizonte y estado.
 - El historial de simulación conserva margen, apalancamiento, notional, costes de entrada y salida,
-  PnL y motivo de cierre. El monitor automático se ejecuta en segundo plano cada 30 segundos y
+  PnL y motivo de cierre. El monitor automático se ejecuta en segundo plano cada 60 segundos por
+  defecto, aunque estés en otra pestaña, siempre que el servidor siga abierto, y
   evita duplicar una predicción para la misma vela; una predicción nueva aparece al llegar una vela
   nueva del timeframe correspondiente.
 - Los sábados y domingos el monitor pausa acciones, ETFs, índices, divisas y materias primas;

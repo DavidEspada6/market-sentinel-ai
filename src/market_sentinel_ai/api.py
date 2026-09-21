@@ -120,7 +120,6 @@ def create_app(
         monitor_thread = Thread(
             target=prediction_monitor.run_forever,
             args=(monitor_stop,),
-            kwargs={"interval_seconds": 30},
             daemon=True,
             name="market-sentinel-predictions",
         )

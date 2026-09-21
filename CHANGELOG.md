@@ -4,6 +4,15 @@ All notable changes to Market Sentinel AI will be documented in this file.
 
 The project follows semantic versioning once v1.0.0 is reached. Pre-1.0 releases map to the staged roadmap.
 
+## [2.11.2] - 2026-09-21
+
+### Fixed
+
+- Fixed the analytics page JavaScript name collision that left the product and latest-prediction
+  tables stuck on `Cargando...`.
+- Changed the background prediction and market refresh loop to use `MARKET_DATA_POLL_SECONDS`,
+  which defaults to one minute and runs independently of the active browser tab.
+
 ## [2.11.1] - 2026-09-21
 
 ### Fixed

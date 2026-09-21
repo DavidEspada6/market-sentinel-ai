@@ -215,12 +215,12 @@ FOLLOW_ON_PLAN: tuple[Release, ...] = (
     ),
     Release(
         code="O11",
-        version="2.11.1",
-        title="Complete Horizon Analytics",
+        version="2.11.2",
+        title="Reliable Analytics And Background Refresh",
         objective=(
             "Add 10-minute and 2-hour horizons, complete horizon-by-horizon analytics, cached "
-            "live-news context, regime-aware confidence filters and a resettable prediction "
-            "evaluation history."
+            "live-news context, regime-aware confidence filters, one-minute background market "
+            "refresh and a resettable prediction evaluation history."
         ),
     ),
     Release(

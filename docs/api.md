@@ -20,7 +20,9 @@ The default binding is local-only. The service does not place real orders.
 - GET /api/v1/runs lists scheduler runs.
 - GET /api/v1/operations/summary returns watchlist, signal, alert, scheduler and health counts.
 - POST /api/v1/predictions/run runs one prediction-monitor cycle immediately.
-- GET /api/v1/predictions/status returns the automatic monitor state and pending count.
+- GET /api/v1/predictions/status returns the automatic monitor state, pending count and configured
+  refresh interval. The web server starts this monitor in the background; the default interval is
+  one minute through `MARKET_DATA_POLL_SECONDS=60`.
 - GET /api/v1/predictions lists saved predictions with optional symbol, timeframe, window, status
   and limit filters. Status is pending or resolved.
 - POST /api/v1/predictions/reset clears prediction evaluations and their aciertos/fallos without

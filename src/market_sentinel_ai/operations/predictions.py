@@ -43,9 +43,13 @@ class PredictionMonitorRun:
 class PredictionMonitor:
     """Continuously creates one forecast per watchlist/window/candle and scores it later."""
 
-    def __init__(self, service: MarketScanService) -> None:
+    def __init__(self, service: MarketScanService, interval_seconds: int | None = None) -> None:
+        configured_interval = interval_seconds or service.settings.market_data.poll_seconds
+        if configured_interval <= 0:
+            raise ValueError("interval_seconds must be positive")
         self.service = service
         self.repository = service.repository
+        self.interval_seconds = configured_interval
         self._lock = Lock()
         self._last_run: PredictionMonitorRun | None = None
         self._running = False
@@ -112,10 +116,11 @@ class PredictionMonitor:
                 self._running = False
         return result
 
-    def run_forever(self, stop_event: Event, interval_seconds: int = 30) -> None:
+    def run_forever(self, stop_event: Event, interval_seconds: int | None = None) -> None:
+        interval = interval_seconds or self.interval_seconds
         while not stop_event.is_set():
             self.run_once()
-            stop_event.wait(max(5, interval_seconds))
+            stop_event.wait(max(5, interval))
 
     def status(self) -> dict[str, object]:
         with self._lock:
@@ -126,7 +131,7 @@ class PredictionMonitor:
             "running": running,
             "pending": pending,
             "last_run": last_run.to_dict() if last_run else None,
-            "interval_seconds": 30,
+            "interval_seconds": self.interval_seconds,
             "watchlist_size": len(self.repository.list_watchlist()),
             "windows": [spec.window.value for spec in chart_window_specs() if spec.lookback],
         }
