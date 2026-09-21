@@ -118,6 +118,31 @@ class PredictionEvaluationTests(unittest.TestCase):
             self.assertEqual(response.json()["accuracy_pct"], 100.0)
             self.assertEqual(response.json()["best_window"], "1m")
 
+            all_results = client.get("/api/v1/prediction-analytics").json()
+            self.assertEqual(
+                [row["key"] for row in all_results["by_window"]],
+                [
+                    "1m",
+                    "5m",
+                    "10m",
+                    "30m",
+                    "1h",
+                    "2h",
+                    "6h",
+                    "12h",
+                    "1d",
+                    "1w",
+                    "1mo",
+                    "3mo",
+                    "6mo",
+                    "1y",
+                    "3y",
+                ],
+            )
+            self.assertEqual(all_results["by_window"][2]["total"], 0)
+            self.assertEqual(all_results["by_window"][4]["total"], 0)
+            self.assertEqual(all_results["by_window"][5]["total"], 0)
+
             reset = client.post("/api/v1/predictions/reset")
             self.assertEqual(reset.status_code, 200)
             self.assertEqual(reset.json()["deleted"], 1)

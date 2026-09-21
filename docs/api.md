@@ -26,7 +26,10 @@ The default binding is local-only. The service does not place real orders.
 - POST /api/v1/predictions/reset clears prediction evaluations and their aciertos/fallos without
   deleting market candles or simulation trades.
 - GET /api/v1/prediction-analytics returns overall, per-horizon and per-symbol counts, accuracy,
-  average expected/actual returns and recent records with the same filters.
+  average expected/actual returns and recent records with the same filters. `by_window` always
+  includes the complete configured forecast-horizon catalog in chronological order, with zero
+  counts for horizons that have not produced a sample yet; `by_symbol` also includes watchlist
+  instruments with no samples.
 - GET /api/v1/instruments searches the curated instrument universe with optional \`q\`,
   \`asset_class\`, \`limit\` and \`source\` filters. Source can be \`local\`, \`provider\` or
   \`auto\`.

@@ -18,6 +18,7 @@ from market_sentinel_ai.analytics import (
     build_market_chart_payload,
     calculate_risk_metrics,
     chart_window_spec,
+    chart_window_specs,
 )
 from market_sentinel_ai.config import Settings
 from market_sentinel_ai.dashboard import render_operational_dashboard, render_prediction_analytics
@@ -399,13 +400,21 @@ def create_app(
                 "avg_expected_return_bps": sum(expected) / len(expected) if expected else None,
             }
 
-        def grouped(items_by_key: dict[str, list]) -> list[dict[str, object]]:
+        def grouped(
+            items_by_key: dict[str, list],
+            keys: list[str] | None = None,
+        ) -> list[dict[str, object]]:
+            ordered_keys = keys if keys is not None else sorted(items_by_key)
             return [
-                {"key": key, **aggregate(items)}
-                for key, items in sorted(items_by_key.items())
+                {"key": key, **aggregate(items_by_key.get(key, []))}
+                for key in ordered_keys
             ]
 
-        horizon_rows = grouped(by_window)
+        forecast_windows = [
+            spec.window.value for spec in chart_window_specs() if spec.lookback is not None
+        ]
+        horizon_keys = [window] if window in forecast_windows else forecast_windows
+        horizon_rows = grouped(by_window, horizon_keys)
         scored_horizons = [
             item for item in horizon_rows if item["accuracy_pct"] is not None
         ]
@@ -414,6 +423,12 @@ def create_app(
             if scored_horizons
             else None
         )
+        watchlist_symbols = {
+            item.symbol for item in repository.list_watchlist()
+        }
+        if symbol:
+            watchlist_symbols.add(symbol.upper())
+        symbol_keys = sorted(set(by_symbol) | watchlist_symbols)
         return {
             "filters": {
                 "symbol": symbol,
@@ -425,7 +440,7 @@ def create_app(
             **aggregate(records),
             "best_window": best["key"] if best else None,
             "by_window": horizon_rows,
-            "by_symbol": grouped(by_symbol),
+            "by_symbol": grouped(by_symbol, symbol_keys),
             "recent": [item.to_dict() for item in records[:100]],
         }
 

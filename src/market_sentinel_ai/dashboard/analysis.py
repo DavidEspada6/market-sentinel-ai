@@ -62,7 +62,7 @@ def render_prediction_analytics() -> str:
     <div class="intro">
       <div>
         <h2>Historial de aciertos y fallos</h2>
-        <p>Las predicciones se guardan automáticamente para toda la watchlist. Una predicción pasa a resuelta cuando llega su horizonte y se compara contra el precio real disponible.</p>
+        <p>Las predicciones se guardan automáticamente para toda la watchlist. La tabla incluye todos los horizontes configurados, aunque todavía no tengan muestras. Una predicción pasa a resuelta cuando llega su horizonte y se compara contra el precio real disponible.</p>
       </div>
     </div>
     <form class="filters" id="filters">
@@ -90,9 +90,10 @@ def render_prediction_analytics() -> str:
     const money = (value) => value === null || value === undefined ? '-' : Number(value).toFixed(4);
     function metric(label, value, className = '') { return `<div class="panel metric ${className}"><span>${label}</span><strong>${safe(value)}</strong></div>`; }
     function resultClass(value) { return value === true ? 'positive' : value === false ? 'negative' : 'pending'; }
+    function accuracyClass(value) { return value === null || value === undefined ? 'pending' : Number(value) >= 50 ? 'positive' : 'negative'; }
     function aggregateRow(item, includeProduct) {
       const accuracy = item.accuracy_pct;
-      const cls = accuracy === null ? '' : accuracy >= 50 ? 'positive' : 'negative';
+      const cls = accuracyClass(accuracy);
       return `<tr><td>${includeProduct ? safe(item.key) : safe(item.key)}</td><td>${item.total}</td><td>${item.resolved}</td><td>${item.correct}</td><td>${item.incorrect ?? '-'}</td><td class="${cls}">${pct(accuracy)}</td><td>${bps(item.avg_actual_return_bps)}</td></tr>`;
     }
     function render(payload) {
@@ -104,7 +105,7 @@ def render_prediction_analytics() -> str:
         metric('Mejor horizonte', safe(payload.best_window), 'good'), metric('Retorno real medio', bps(payload.avg_actual_return_bps))
       ].join('');
       $('window-rows').innerHTML = payload.by_window.length ? payload.by_window.map((item) => aggregateRow(item, false)).join('') : '<tr><td colspan="7" class="muted">Sin resultados para estos filtros.</td></tr>';
-      $('symbol-rows').innerHTML = payload.by_symbol.length ? payload.by_symbol.map((item) => `<tr><td>${safe(item.key)}</td><td>${item.total}</td><td>${item.resolved}</td><td>${item.correct}</td><td class="${item.accuracy_pct !== null && item.accuracy_pct >= 50 ? 'positive' : 'negative'}">${pct(item.accuracy_pct)}</td><td>${bps(item.avg_actual_return_bps)}</td></tr>`).join('') : '<tr><td colspan="6" class="muted">Sin resultados para estos filtros.</td></tr>';
+      $('symbol-rows').innerHTML = payload.by_symbol.length ? payload.by_symbol.map((item) => `<tr><td>${safe(item.key)}</td><td>${item.total}</td><td>${item.resolved}</td><td>${item.correct}</td><td class="${accuracyClass(item.accuracy_pct)}">${pct(item.accuracy_pct)}</td><td>${bps(item.avg_actual_return_bps)}</td></tr>`).join('') : '<tr><td colspan="6" class="muted">Sin resultados para estos filtros.</td></tr>';
       $('recent-rows').innerHTML = payload.recent.length ? payload.recent.map((item) => `<tr><td>${safe(item.symbol)}</td><td>${safe(item.window)}</td><td>${safe(item.direction)}</td><td>${(Number(item.confidence) * 100).toFixed(1)}%</td><td>${money(item.reference_price)}</td><td>${money(item.actual_price)}</td><td>${bps(item.actual_return_bps)}</td><td class="${resultClass(item.correct)}">${item.status === 'pending' ? 'PENDIENTE' : item.correct ? 'ACIERTO' : 'FALLO'}</td><td>${safe(item.generated_at)}</td><td>${safe(item.due_at)}</td></tr>`).join('') : '<tr><td colspan="10" class="muted">Sin predicciones registradas todavía.</td></tr>';
     }
     async function load() {

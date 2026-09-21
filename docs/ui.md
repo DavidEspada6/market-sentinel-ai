@@ -58,7 +58,9 @@ externamente tienen prioridad sobre `.env`.
 - El menú superior abre **Análisis de predicciones**. La aplicación guarda automáticamente las
   predicciones de cada producto y horizonte mientras el servidor está abierto, las compara con el
   precio real cuando vence cada horizonte y muestra aciertos, fallos, pendientes, mejor horizonte,
-  retorno medio y detalle por producto. Puedes filtrar por símbolo, timeframe, horizonte y estado.
+  retorno medio y detalle por producto. La tabla de resultados muestra todos los horizontes
+  configurados, aunque todavía tengan cero muestras. Puedes filtrar por símbolo, timeframe,
+  horizonte y estado.
 - El historial de simulación conserva margen, apalancamiento, notional, costes de entrada y salida,
   PnL y motivo de cierre. El monitor automático se ejecuta en segundo plano cada 30 segundos y
   evita duplicar una predicción para la misma vela; una predicción nueva aparece al llegar una vela

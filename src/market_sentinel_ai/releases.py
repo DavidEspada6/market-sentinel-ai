@@ -215,11 +215,12 @@ FOLLOW_ON_PLAN: tuple[Release, ...] = (
     ),
     Release(
         code="O11",
-        version="2.11.0",
-        title="Short-Horizon Context And Evaluation Reset",
+        version="2.11.1",
+        title="Complete Horizon Analytics",
         objective=(
-            "Add 10-minute and 2-hour horizons, cached live-news context, regime-aware confidence "
-            "filters and a resettable prediction evaluation history."
+            "Add 10-minute and 2-hour horizons, complete horizon-by-horizon analytics, cached "
+            "live-news context, regime-aware confidence filters and a resettable prediction "
+            "evaluation history."
         ),
     ),
     Release(
